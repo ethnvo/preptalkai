@@ -1,4 +1,4 @@
-````markdown
+
 # PrepTalk.ai – Frontend
 
 This is the frontend for **PrepTalk.ai**, an AI-powered interview prep tool that simulates behavioral interviews using personas like Jeff Bezos. Built with **Next.js**, **TypeScript**, and **Tailwind CSS**.
@@ -16,7 +16,6 @@ This is the frontend for **PrepTalk.ai**, an AI-powered interview prep tool that
    From the `frontend/` directory, run:
    ```bash
    npm install
-````
 
 2. **Run the development server**
 
