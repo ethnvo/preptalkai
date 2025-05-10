@@ -56,7 +56,7 @@ This is the backend for **PrepTalk.ai**, a Flask-based API that powers the AI in
 ## 🚀 Setup Instructions
 
 1. **Install dependencies**
-
+   From the `backend/` directory, run:
    ```bash
    pip install -r requirements.txt
    ```
