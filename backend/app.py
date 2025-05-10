@@ -12,3 +12,6 @@ def start():
     
     # Process or respond with something
     return jsonify({'message': 'Received!', 'summary': job_description[:100]})
+
+if __name__ == "__main__":
+    app.run(debug=True)
