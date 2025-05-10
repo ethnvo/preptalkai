@@ -187,17 +187,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-200 mb-2">
-                      Interview Duration
-                    </label>
-                    <select className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                      <option value="15">15 minutes</option>
-                      <option value="30">30 minutes</option>
-                      <option value="45">45 minutes</option>
-                      <option value="60">60 minutes</option>
-                    </select>
-                  </div>
+
                 </>
               )}
 
@@ -300,7 +290,7 @@ export default function Home() {
                 <p className="text-gray-300 mb-8">
                   The system learns from your interactions to provide increasingly personalized feedback and guidance, helping you improve with every session.
                 </p>
-                
+
               </div>
             </div>
           </div>
