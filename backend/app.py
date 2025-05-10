@@ -1,68 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-
+import json
 import boto3
 import os
-
-app = Flask(__name__)
-CORS(app)
-
-@app.route('/api/start', methods=['POST'])
-def start():
-    data = request.get_json()
-    job_description = data.get('jobDescription', '')
-    print('Received job description:', job_description)
-
-
-    # Start making initial prompt for LLM WE ARE USING SONNET 3.7
-    body = {
-        "messages": [
-            {
-                "role": "user",
-                "content": f
-                '''
-                You are Jeff Bezos, the CEO of Amazon, and you are interviewing a potential employee for this job:
-                {job_description}, 
-
-                Here are some guidelines about the tonalities and behaviors you should mimic:
-                {bezos_tonality}
-
-                Please give me five questions that could be asked in the interview taking into account the job description and guidelines.
-
-                Respond with a JSON object with the following format:
-
-                {{
-                    "questions": [
-                        "Question 1",
-                        "Question 2",
-                        "Question 3",
-                        "Question 4",
-                        "Question 5"
-                    ]
-                }}
-
-                '''
-            }
-        ],
-        "max_tokens": 500,
-        "temperature": 0.7
-    }
-
-    # Store the response from the LLM
-    response = bedrock.invoke_model(
-        modelId="anthropic.claude-3-sonnet-20240229-v1:0",
-        body=json.dumps(body),
-        contentType="application/json",
-        accept="application/json"
-    )
-
-
-    response_body = json.loads(response['body'].read())
-    message = response_body.get("content", "No response from Claude.")
-    
-    # Process or respond with something
-    return jsonify({'message': message})
-
 
 
 bezos_tonality = '''
@@ -90,3 +30,77 @@ bezos_tonality = '''
 - **Example Question**:  
   "Tell me about a time when you took a risk in your work. What factors did you consider before making the decision?"
 '''
+
+app = Flask(__name__)
+CORS(app)
+
+session = boto3.Session(profile_name="preptalk-ai")
+bedrock_client = session.client(
+    service_name = "bedrock-runtime",
+    region_name  = "us-west-2"
+)
+
+modelID = "arn:aws:bedrock:us-west-2:381491848551:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+
+
+@app.route('/api/start', methods=['POST'])
+def start():
+    data = request.get_json()
+    job_description = data.get('jobDescription', '')
+  #  print('Received job description:', job_description)
+
+
+    # Start making initial prompt for LLM WE ARE USING SONNET 3.7
+
+    body = {
+    "anthropic_version": "bedrock-2023-05-31",  
+    "messages": [
+        {
+            "role": "user",
+            "content": f'''
+            You are Jeff Bezos, the CEO of Amazon, and you are interviewing a potential employee for this job:
+            {job_description}, 
+
+            Here are some guidelines about the tonalities and behaviors you should mimic:
+            {bezos_tonality}
+
+            Please give me five questions that could be asked in the interview taking into account the job description and guidelines.
+
+            Respond with a JSON object with the following format:
+
+            {{
+                "questions": [
+                    "Question 1",
+                    "Question 2",
+                    "Question 3",
+                    "Question 4",
+                    "Question 5"
+                ]
+            }}
+            '''
+        }
+    ],
+    "max_tokens": 500,
+    "temperature": 0.5
+}
+
+
+    # Store the response from the LLM
+    response = bedrock_client.invoke_model(
+        modelId=modelID,
+        body=json.dumps(body),
+        contentType="application/json",
+        accept="application/json"
+    )
+
+
+    response_body = json.loads(response['body'].read())
+    message = response_body.get("content", "No response from Claude.")
+    print("Claude response:", message)
+
+    # Process or respond with something
+    return jsonify({'message': message})
+
+
+if __name__ == "__main__":
+    app.run(debug=True, port="5050")
