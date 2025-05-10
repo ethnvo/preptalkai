@@ -35,6 +35,7 @@ app = Flask(__name__)
 CORS(app)
 
 session = boto3.Session(profile_name="preptalk-ai")
+
 bedrock_client = session.client(
     service_name = "bedrock-runtime",
     region_name  = "us-west-2"
@@ -95,11 +96,38 @@ def start():
 
 
     response_body = json.loads(response['body'].read())
-    message = response_body.get("content", "No response from Claude.")
-    print("Claude response:", message)
+    print("Raw Bedrock response:", response_body)
 
-    # Process or respond with something
-    return jsonify({'message': message})
+    # Try both keys, fallback safely
+    claude_blocks = response_body.get("message") or response_body.get("content")
+
+    if not claude_blocks:
+        return jsonify({"error": "Claude response missing 'message' or 'content'"}), 500
+
+    claude_text = claude_blocks[0].get("text", "").strip()
+
+    # Strip surrounding code block
+    clean_json_str = (
+        claude_text
+        .removeprefix("```json")
+        .removesuffix("```")
+        .strip()
+    )
+
+    try:
+        parsed = json.loads(clean_json_str)
+        questions = parsed.get("questions", [])
+        return jsonify({
+                "question1": {"text": questions[0], "audio": ""},
+                "question2": {"text": questions[1], "audio": ""},
+                "question3": {"text": questions[2], "audio": ""},
+                "question4": {"text": questions[3], "audio": ""},
+                "question5": {"text": questions[4], "audio": ""}
+            })
+    except Exception as e:
+        print("Parsing error:", e)
+        return jsonify({"error": "Could not parse Claude's response"}), 500
+
 
 
 if __name__ == "__main__":
