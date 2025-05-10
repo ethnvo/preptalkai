@@ -5,9 +5,18 @@ import { useState } from 'react';
 export default function Home() {
   const [jobDescription, setJobDescription] = useState('');
 
-  const handleStart = () => {
-    console.log('Job Description:', jobDescription);
-    // You can route or send the data to your backend here
+  const handleStart = async () => {
+    try {
+      const res = await fetch('http://localhost:5000/api/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobDescription }),
+      });
+      const data = await res.json();
+      console.log('Response:', data);
+    } catch (err) {
+      console.error('Error:', err);
+    }
   };
 
   return (
