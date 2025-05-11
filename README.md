@@ -1,4 +1,3 @@
-
 # PrepTalk.ai – Frontend
 
 This is the frontend for **PrepTalk.ai**, an AI-powered interview prep tool that simulates behavioral interviews using personas like Jeff Bezos. Built with **Next.js**, **TypeScript**, and **Tailwind CSS**.
@@ -14,8 +13,10 @@ This is the frontend for **PrepTalk.ai**, an AI-powered interview prep tool that
 
 1. **Install dependencies**  
    From the `frontend/` directory, run:
+
    ```bash
    npm install
+   ```
 
 2. **Run the development server**
 
@@ -37,10 +38,6 @@ frontend/
 └── package.json      # Project dependencies
 ```
 
-## 🧠 About
-
-PrepTalk.ai helps users practice high-stakes interviews using AI-generated scenarios and feedback. This frontend connects to the backend API (Flask + AWS) and handles user interaction.
-
 ---
 
 # PrepTalk.ai – Backend
@@ -49,44 +46,39 @@ This is the backend for **PrepTalk.ai**, a Flask-based API that powers the AI in
 
 ## 🔧 Tech Stack
 
-* Python 3
-* Flask
-* (Future) AWS SDK (e.g. Boto3 or AWS Lambda)
+- Python 3.11
+- Flask
+- flask-cors
+- boto3 (for AWS integration)
+- pygame (for audio support)
 
-## 🚀 Setup Instructions
+## 🛠 Setup Instructions
 
-1. **Install dependencies**
-   From the `backend/` directory, run:
+1. **Create and activate virtual environment**  
+   From the `backend/` directory:
+
+   ```bash
+   /opt/homebrew/opt/python@3.11/bin/python3.11 -m venv venv
+   source venv/bin/activate
+   ```
+
+2. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
 
-2. **Run the Flask server**
+3. **Run the Flask server**
 
    ```bash
    python app.py
    ```
 
-3. The API will be available at:
+4. The API will be available at:
 
    ```
    http://localhost:5000
    ```
-
-## 🧪 Example Endpoint
-
-### `POST /api/generate-question`
-
-Returns a sample interview question and persona.
-
-**Example Response**:
-
-```json
-{
-  "question": "Describe a time you took initiative.",
-  "persona": "Jeff Bezos"
-}
-```
 
 ## 📁 Project Structure
 
@@ -94,4 +86,24 @@ Returns a sample interview question and persona.
 backend/
 ├── app.py              # Flask app entrypoint
 ├── requirements.txt    # Python dependencies
+├── venv/               # Virtual environment (ignored by Git)
 ```
+
+---
+
+## 🧾 Git Best Practices
+
+- A `.gitignore` file is included in the **project root** to ignore:
+
+  - `node_modules/`
+  - `backend/venv/`
+  - Python cache files
+  - Next.js and build artifacts
+
+- Always activate your virtual environment before running or installing Python packages:
+
+  ```bash
+  source backend/venv/bin/activate
+  ```
+
+---

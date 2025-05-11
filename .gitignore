@@ -1,0 +1,44 @@
+# === Frontend (Next.js, React, TypeScript, Tailwind) ===
+# dependencies
+frontend/node_modules/
+.pnp/
+.pnp.js
+
+# Next.js build output
+.next/
+out/
+build/
+
+# environment variables
+.env
+.env.local
+.env.*.local
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# editor
+.vscode/
+.DS_Store
+
+# === Backend (Python, Flask, virtualenv) ===
+# virtual environment
+backend/venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# local dev
+*.log
