@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MockTalkAI",
+  title: "AWSpeak",
   description: "A realistic mock interview experience using AI.",
 };
 
