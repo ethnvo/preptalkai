@@ -1,5 +1,4 @@
 from flask import Flask, jsonify
-from concurrent.futures import ThreadPoolExecutor
 from flask_cors import CORS
 import boto3
 import base64
@@ -10,7 +9,7 @@ CORS(app)
 
 def text_to_audio(text, boto3_session=None):
     if boto3_session is None:
-            boto3_session = boto3.Session()
+        boto3_session = boto3.Session(profile_name="preptalk-ai")
 
     polly = boto3_session.client('polly', region_name='us-west-2')
 

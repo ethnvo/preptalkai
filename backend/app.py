@@ -3,6 +3,7 @@ from flask_cors import CORS
 import json
 import boto3
 import helper_polly
+import helper_transcribe
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -136,5 +137,19 @@ def start():
         print("Parsing error:", e)
         return jsonify({"error": "Could not parse Claude's response"}), 500
 
+@app.route('/api/transcribe', methods=['POST'])
+def transcribe():
+    data = request.get_json()
+    audio_base64 = data.get("audio", "")
+    if not audio_base64:
+        return jsonify({"error": "Missing 'audio' in request"}), 400
+
+    try:
+        text = helper_transcribe.audio_to_text(audio_base64)
+        return jsonify({"transcript": text})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     app.run(debug=True, port=5050)
+
