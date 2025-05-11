@@ -12,6 +12,8 @@ transcriptQA = {
     "answers": []
 }
 
+
+
 app = Flask(__name__)
 CORS(app)
 
@@ -34,7 +36,7 @@ def start():
     transcriptQA = {
       "questions": [],
       "answers": []
-    }
+    }  
 
 
     data = request.get_json()
@@ -122,7 +124,7 @@ def start():
                     audio = future.result()
                     results[f"question{i+1}"] = {
                         "text": questions[i],
-            #            "audio": audio
+                        "audio": audio
                     }
                 except Exception as e:
                     results[f"question{i+1}"] = {
@@ -156,15 +158,12 @@ def transcribe():
 
 
 
-@app.route('/api/evaluate', methods=['POST'])
+@app.route('/api/evaluate', methods=['GET'])
 def evaluate():
-    #HANDLE THE LAST TRANSCRIPTION BEFORE EVALUATION, EITHER HERE, OR HAVE THE FINAL BUTTON CALL TRANSCRIBE THEN EVALAUATE OR TWO DIFFERENT BUTTONS
-    data = request.get_json()
+    global transcriptQA
 
-    transcriptQA = {
-        "questions": data.get("questions", []),
-        "answers": data.get("answers", [])
-    }
+    if not transcriptQA["questions"] or not transcriptQA["answers"]:
+        return jsonify({"error": "Transcript data is incomplete"}), 400
 
     body = {
         "anthropic_version": "bedrock-2023-05-31",
@@ -206,7 +205,6 @@ def evaluate():
     )
 
     response_body = json.loads(response['body'].read())
-    #print("Raw Bedrock response:", response_body)
 
     claude_blocks = response_body.get("message") or response_body.get("content")
     if not claude_blocks:
@@ -219,8 +217,6 @@ def evaluate():
         .removesuffix("```")
         .strip()
     )
-
-    #THE JSON OBJECT THAT IS RETURNED SHOULD INCLUDE THE TOTAL SCORE, FEEDBACK, AND TRANSCRIPT
 
     try:
         parsed = json.loads(clean_json_str)
@@ -239,12 +235,6 @@ def evaluate():
     except Exception as e:
         print("Evaluation parsing error:", e)
         return jsonify({"error": "Could not parse Claude's evaluation output"}), 500
-
-
-
-#idk what this is who made this - Tyler
-# @app.route('/api/get_questions', methods=['GET'])
-
 
 
 if __name__ == "__main__":
