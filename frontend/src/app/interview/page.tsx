@@ -712,6 +712,14 @@ const InterviewPage: React.FC = () => {
     setIsEvaluating(true);
     
     try {
+      // Ensure all responses are sent to backend first
+      for (let i = 0; i < questions.length; i++) {
+        if (audioBlobs[i] && responses[i]) {
+          await sendAudioForBackendTranscription(i);
+        }
+      }
+      
+      // Now request evaluation
       const response = await fetch('http://localhost:5050/api/evaluate', {
         method: 'GET',
         headers: {
