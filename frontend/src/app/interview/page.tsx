@@ -19,12 +19,15 @@ const InterviewPage: React.FC = () => {
   const [audioReady, setAudioReady] = useState<boolean>(false);
   const [questionPlayed, setQuestionPlayed] = useState<{[key: number]: boolean}>({});
   const [transcript, setTranscript] = useState<string>('');
+  const [audioBlobs, setAudioBlobs] = useState<{[key: number]: Blob}>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
+  const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
   
   useEffect(() => {
     // Load questions and job title from localStorage
@@ -86,15 +89,13 @@ const InterviewPage: React.FC = () => {
     // Clean up function
     return () => {
       stopRecording();
+      stopAudioPlayback();
+      stopSpeechSynthesis();
+      
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
       }
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = '';
-      }
       
-      // Clean up speech recognition if active
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -104,6 +105,19 @@ const InterviewPage: React.FC = () => {
       }
     };
   }, []);
+
+  const stopAudioPlayback = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+  };
+
+  const stopSpeechSynthesis = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  };
 
   // Set audio as ready when current question changes and auto-play
   useEffect(() => {
@@ -231,6 +245,8 @@ const InterviewPage: React.FC = () => {
     if ('speechSynthesis' in window && questions[currentQuestionIndex]) {
       console.log('Using speech synthesis fallback');
       const utterance = new SpeechSynthesisUtterance(questions[currentQuestionIndex]);
+      synthesisRef.current = utterance;
+      
       utterance.onend = () => {
         setIsPlaying(false);
         
@@ -398,6 +414,11 @@ const InterviewPage: React.FC = () => {
           [currentQuestionIndex]: audioUrl
         }));
         
+        setAudioBlobs(prev => ({
+          ...prev,
+          [currentQuestionIndex]: audioBlob
+        }));
+        
         // Use the transcript from speech recognition if available
         if (transcript) {
           setResponses(prev => ({
@@ -419,7 +440,7 @@ const InterviewPage: React.FC = () => {
       // Start speech recognition alongside recording
       startSpeechRecognition();
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Recording error:', error);
       // Provide specific error messages based on error type
       if (error.name === 'NotAllowedError') {
@@ -475,18 +496,119 @@ const InterviewPage: React.FC = () => {
     }));
   };
   
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
-      setInterviewComplete(true);
-      setShowTranscript(true);
+  const sendAudioToBackend = async (questionIndex: number) => {
+    if (!audioBlobs[questionIndex]) {
+      console.log('No audio blob available for this question');
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      console.log(`Sending audio for question ${questionIndex + 1} to backend for transcription`);
+      
+      const reader = new FileReader();
+      
+      return new Promise<void>((resolve, reject) => {
+        reader.onloadend = async () => {
+          try {
+            const base64Audio = reader.result?.toString().split(',')[1];
+            
+            if (!base64Audio) {
+              console.error('Failed to convert audio to base64');
+              setIsSubmitting(false);
+              reject(new Error('Failed to convert audio to base64'));
+              return;
+            }
+            
+            const response = await fetch('http://localhost:5050/api/transcribe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                questionIndex,
+                audioBase64: base64Audio,
+                question: questions[questionIndex],
+                jobTitle
+              })
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Failed to transcribe audio: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Transcription response:', data);
+            
+            if (data.transcript) {
+              setResponses(prev => ({
+                ...prev,
+                [questionIndex]: data.transcript
+              }));
+            }
+            
+            setIsSubmitting(false);
+            resolve();
+          } catch (error) {
+            console.error('Error sending audio to backend:', error);
+            setIsSubmitting(false);
+            reject(error);
+          }
+        };
+        
+        reader.onerror = () => {
+          console.error('Error reading audio file');
+          setIsSubmitting(false);
+          reject(new Error('Error reading audio file'));
+        };
+        
+        reader.readAsDataURL(audioBlobs[questionIndex]);
+      });
+    } catch (error) {
+      console.error('Error preparing audio for backend:', error);
+      setIsSubmitting(false);
+      throw error;
     }
   };
   
-  const handleFinishInterview = () => {
-    setInterviewComplete(true);
-    setShowTranscript(true);
+  const handleNextQuestion = async () => {
+    if (isSubmitting) return;
+    
+    try {
+      if (audioBlobs[currentQuestionIndex]) {
+        await sendAudioToBackend(currentQuestionIndex);
+      }
+      
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+      } else {
+        setInterviewComplete(true);
+        setShowTranscript(true);
+      }
+    } catch (error) {
+      console.error('Error processing next question:', error);
+      
+      // Continue anyway so the user isn't stuck
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+      } else {
+        setInterviewComplete(true);
+        setShowTranscript(true);
+      }
+    }
+  };
+  
+  const handleFinishInterview = async () => {
+    if (isSubmitting) return;
+    
+    try {
+      if (audioBlobs[currentQuestionIndex]) {
+        await sendAudioToBackend(currentQuestionIndex);
+      }
+    } catch (error) {
+      console.error('Error sending final audio:', error);
+    } finally {
+      setInterviewComplete(true);
+      setShowTranscript(true);
+    }
   };
   
   const handleReturnHome = () => {
@@ -502,6 +624,34 @@ const InterviewPage: React.FC = () => {
     if (!isPlaying && !isRecording && countdown === null) {
       playQuestionAudio();
     }
+  };
+  
+  const handleRecordAgain = () => {
+    // Clear the previous response and restart
+    setResponses(prev => {
+      const newResponses = {...prev};
+      delete newResponses[currentQuestionIndex];
+      return newResponses;
+    });
+    
+    // Reset the played state so we can re-listen
+    setQuestionPlayed(prev => ({
+      ...prev,
+      [currentQuestionIndex]: false
+    }));
+    
+    // Clear transcript
+    setTranscript('');
+    
+    // Remove the audio data for this question to start fresh
+    setAudioBlobs(prev => {
+      const newBlobs = {...prev};
+      delete newBlobs[currentQuestionIndex];
+      return newBlobs;
+    });
+    
+    // Start playback again
+    setTimeout(() => playQuestionAudio(), 300);
   };
   
   if (loading) {
@@ -540,6 +690,7 @@ const InterviewPage: React.FC = () => {
               <button
                 onClick={handleReturnHome}
                 className="px-4 py-2 bg-gray-800 text-gray-300 rounded-md hover:bg-gray-700 transition"
+                disabled={isRecording || isSubmitting || countdown !== null}
               >
                 Exit Interview
               </button>
@@ -567,7 +718,10 @@ const InterviewPage: React.FC = () => {
                   {!interviewComplete && (
                     <button 
                       onClick={handleFinishInterview}
-                      className="px-4 py-2 bg-gray-800 text-gray-300 rounded-md hover:bg-gray-700 transition"
+                      disabled={isSubmitting || isRecording || countdown !== null}
+                      className={`px-4 py-2 bg-gray-800 text-gray-300 rounded-md hover:bg-gray-700 transition ${
+                        (isSubmitting || isRecording || countdown !== null) ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
                       Finish Early
                     </button>
@@ -697,49 +851,19 @@ const InterviewPage: React.FC = () => {
                         </p>
                         <p className="text-gray-400 text-sm mb-6">
                           {responses[currentQuestionIndex]
-                            ? "You can proceed to the next question or re-record your answer"
-                            : "Click 'Play Question' to hear the question and begin"}
+                            ? "Your answer has been recorded and will be sent when you proceed to the next question"
+                            : "Click 'Play Question' to hear the question and begin answering"}
                         </p>
                         
-                        {/* Show a replay button for question */}
-                        {!isPlaying && !isRecording && countdown === null && (
-                          <div className="flex space-x-4">
-                            {responses[currentQuestionIndex] && (
-                              <button
-                                onClick={() => {
-                                  // Clear the previous response and restart
-                                  setResponses(prev => {
-                                    const newResponses = {...prev};
-                                    delete newResponses[currentQuestionIndex];
-                                    return newResponses;
-                                  });
-                                  
-                                  // Reset the played state so we can re-listen
-                                  setQuestionPlayed(prev => ({
-                                    ...prev,
-                                    [currentQuestionIndex]: false
-                                  }));
-                                  
-                                  // Clear transcript
-                                  setTranscript('');
-                                }}
-                                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition flex items-center"
-                              >
-                                <span className="mr-2">🔁</span>
-                                Record Again
-                              </button>
-                            )}
-                            
-                            {audioReady && !responses[currentQuestionIndex] && (
-                              <button 
-                                onClick={handlePlayQuestion}
-                                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition flex items-center"
-                              >
-                                <span className="mr-2">🔊</span>
-                                Play Question
-                              </button>
-                            )}
-                          </div>
+                        {/* Show play button for question when no response is recorded */}
+                        {!isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && audioReady && (
+                          <button 
+                            onClick={handlePlayQuestion}
+                            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition flex items-center"
+                          >
+                            <span className="mr-2">🔊</span>
+                            Play Question
+                          </button>
                         )}
                       </div>
                     )}
@@ -758,14 +882,14 @@ const InterviewPage: React.FC = () => {
                 <div className="flex justify-between mt-12">
                   <button
                     onClick={() => {
-                      // Only allow navigation if not currently recording
-                      if (!isRecording && countdown === null) {
+                      // Only allow navigation if not currently recording or submitting
+                      if (!isRecording && countdown === null && !isSubmitting) {
                         setCurrentQuestionIndex(prev => Math.max(0, prev - 1));
                       }
                     }}
-                    disabled={currentQuestionIndex === 0 || isRecording || countdown !== null}
+                    disabled={currentQuestionIndex === 0 || isRecording || countdown !== null || isSubmitting}
                     className={`px-6 py-3 rounded-lg font-medium transition flex items-center ${
-                      currentQuestionIndex === 0 || isRecording || countdown !== null
+                      currentQuestionIndex === 0 || isRecording || countdown !== null || isSubmitting
                         ? "bg-gray-800 text-gray-500 cursor-not-allowed"
                         : "bg-gray-800 text-gray-200 hover:bg-gray-700"
                     }`}
@@ -776,14 +900,22 @@ const InterviewPage: React.FC = () => {
                   
                   <button
                     onClick={handleNextQuestion}
-                    disabled={!responses[currentQuestionIndex] || isRecording || countdown !== null}
+                    disabled={!responses[currentQuestionIndex] || isRecording || countdown !== null || isSubmitting}
                     className={`px-6 py-3 font-medium rounded-lg transition flex items-center ${
-                      !responses[currentQuestionIndex] || isRecording || countdown !== null
+                      !responses[currentQuestionIndex] || isRecording || countdown !== null || isSubmitting
                         ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                         : "bg-blue-600 text-white hover:bg-blue-700"
                     }`}
                   >
-                    {currentQuestionIndex < questions.length - 1 ? (
+                    {isSubmitting ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Processing...
+                      </>
+                    ) : currentQuestionIndex < questions.length - 1 ? (
                       <>
                         Next
                         <span className="ml-2">→</span>
@@ -796,7 +928,6 @@ const InterviewPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            // Interview transcript (shown at the end)
             <div className="bg-gray-900 rounded-xl shadow-2xl overflow-hidden border border-gray-800 animate-fadeIn">
               <div className="p-6 border-b border-gray-800">
                 <h2 className="text-2xl font-bold text-white">
