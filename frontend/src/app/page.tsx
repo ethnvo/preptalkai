@@ -156,9 +156,13 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h1 className="text-5xl font-bold text-white mb-6">Ace Your Next Interview with AI</h1>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
-              AWSpeakAI provides realistic interview experiences using advanced AI. Perfect your responses and build confidence.
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-4">
+              AWSpeak delivers realistic interviews powered by AI, aligned with Amazon’s core values. 
             </p>
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-4">
+            Perfect your responses and align with what matters most to the company.
+            </p>
+
             <button onClick={() => scrollToSection(featuresRef)} className="px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition inline-flex items-center">
               See how it works
               <span className="ml-2">↓</span>
@@ -236,7 +240,7 @@ const Home: React.FC = () => {
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-white mb-4">Features</h2>
             <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-              AWSpeakAI offers a comprehensive suite of tools to help you prepare for any interview.
+              AWSpeak offers a comprehensive suite of tools to help you prepare for any interview.
             </p>
           </div>
 
@@ -245,9 +249,11 @@ const Home: React.FC = () => {
               <div className="h-12 w-12 bg-blue-900/30 rounded-lg flex items-center justify-center mb-4">
                 <span className="text-2xl">💬</span>
               </div>
-              <h3 className="text-xl font-bold mb-2">Realistic Conversations</h3>
-              <p className="text-gray-400">Experience natural, flowing interviews that adapt to your responses just like a real interviewer would.</p>
-            </div>
+                <h3 className="text-xl font-bold mb-2">Core Value Alignment</h3>
+                <p className="text-gray-400">
+                Each question is crafted to reflect the company's core principles, helping you gain insight into what the organization truly values in its team members.
+                </p>
+               </div>
             
             <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
               <div className="h-12 w-12 bg-purple-900/30 rounded-lg flex items-center justify-center mb-4">
@@ -303,13 +309,15 @@ const Home: React.FC = () => {
                 </div>
               </div>
               <div className="order-1 lg:order-2">
-                <h3 className="text-3xl font-bold mb-6">Powered by Advanced AI</h3>
-                <p className="text-gray-300 mb-4">
-                  Our AI-driven platform simulates real interview experiences by analyzing thousands of actual interview questions and responses.
-                </p>
+                <h3 className="text-3xl font-bold mb-6">Powered by Advanced AI and AWS</h3>
                 <p className="text-gray-300 mb-8">
-                  The system learns from your interactions to provide increasingly personalized feedback and guidance, helping you improve with every session.
+                  Our platform leverages the latest large language models (LLMs) for precise, context-aware interview simulations tailored to your job goals.                </p>
+                <p className="text-gray-300 mb-8">
+                  Powered by AWS technologies like Bedrock for AI, Polly for voice synthesis, Transcribe for speech recognition, and S3 for secure storage, we offer a seamless, scalable mock interview experience.    </p>
+                <p className="text-gray-300 mb-8">
+                  Every interaction is assessed with a context-aware, fair rubric, delivering personalized feedback and actionable insights to help you improve faster with each session.
                 </p>
+
               </div>
             </div>
           </div>
