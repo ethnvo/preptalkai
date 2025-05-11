@@ -1032,7 +1032,7 @@ const InterviewPage: React.FC = () => {
                       <h3 className="text-xl font-bold text-white">Your Interview Performance</h3>
                       <div className="flex items-center">
                         <div className="text-2xl font-bold text-blue-400">{evaluationResults.total_score}</div>
-                        <div className="text-gray-400 ml-1">/100</div>
+                        <div className="text-gray-400 ml-1"></div>
                       </div>
                     </div>
                     

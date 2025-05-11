@@ -44,24 +44,24 @@ bezos_tonality = '''
 
 evaluation_rubric = '''
 
-### 1. **Technical Accuracy (10 points)**
+### 1. **Technical Accuracy (10/100 points)**
    - Assess the correctness of technical information provided by the candidate.
    - If the question is non-technical, this criterion may not apply or may be scored leniently.
    - For technical questions, verify if the answer is accurate and demonstrates depth of understanding.
 
-### 2. **Relevance to Job Description (10 points)**
+### 2. **Relevance to Job Description (10/100 points)**
    - Evaluate how well the candidate's response aligns with the skills and experience required by the job description.
    - Consider whether the response addresses the key skills listed in the job posting.
    - Consider whether the response utilizes keywords relevant to the job description and industry.
    - For general or personal questions, this criterion may be less relevant.
 
 
-### 3. **Response Structure (10 points)**
+### 3. **Response Structure (10/100 points)**
    - Assess the organization and logical flow of the candidate's response.
    - For behavioral or situational questions, check if the candidate follows a clear structure (e.g., STAR method).
    - For technical or direct questions, organization should still be logical, though STAR may not apply.
 
-### 4. **Communication Clarity (25 points)**
+### 4. **Communication Clarity (25/100 points)**
    - Evaluate the clarity, conciseness, and precision of the candidate's response.
    - Look for avoidance of filler words (e.g., "um," "like") and unnecessary verbosity.
    - Ensure technical depth is appropriate for the target audience; overly technical responses should still be understandable.
