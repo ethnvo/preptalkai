@@ -7,6 +7,11 @@ import helper_transcribe
 from concurrent.futures import ThreadPoolExecutor
 import prompts
 
+transcriptQA = {
+    "questions": [],
+    "answers": []
+}
+
 app = Flask(__name__)
 CORS(app)
 
@@ -23,6 +28,15 @@ modelID = "arn:aws:bedrock:us-west-2:381491848551:inference-profile/us.anthropic
 
 @app.route('/api/start', methods=['POST'])
 def start():
+    
+    #We need to reset the transcriptQA dictionary
+    global transcriptQA
+    transcriptQA = {
+      "questions": [],
+      "answers": []
+    }
+
+
     data = request.get_json()
     job_description = data.get('jobDescription', '')
 
@@ -84,6 +98,8 @@ def start():
         parsed = json.loads(clean_json_str)
         questions = parsed.get("questions", [])
 
+        transcriptQA["questions"] = questions
+
         # Use Polly to generate audio for each question
         with ThreadPoolExecutor(max_workers=5) as executor:
             future_to_index = {
@@ -122,6 +138,9 @@ def transcribe():
 
     try:
         text = helper_transcribe.audio_to_text(audio_base64)
+
+        transcriptQA["answers"].append(text)
+        
         return jsonify({"transcript": text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
