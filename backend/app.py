@@ -46,14 +46,22 @@ def start():
             {
                 "role": "user",
                 "content": f'''
+
                 You are Jeff Bezos, the CEO of Amazon, and you are interviewing a potential employee for this job:
                 {job_description}
 
-                Here are some guidelines about the tonalities and behaviors you should mimic:
+                This candidate is not necessarily applying for a technical or computer science-related role. They could come from any professional background such as operations, marketing, design, healthcare, or business.
+
+                Your role is to ask insightful, high-impact interview questions that test a candidate’s fit based on their behavior, leadership, problem-solving, vision, and adaptability—without relying on role-specific technical jargon.
+
+                Only include technical-related questions if they are clearly relevant to the position. Otherwise, focus on evaluating the candidate’s leadership qualities, problem-solving, long-term thinking, and ownership—principles that apply across all professions.
+                
+                Here are some guidelines about the tonalities and behaviors you should base your questions on:
+
                 {bezos_tonality}
 
-                Please give me five questions that could be asked in the interview taking into account the job description and guidelines.
-
+                Please generate five thoughtful, high-impact interview questions that reflect Jeff Bezos' leadership philosophy and are tailored to the job description.
+                
                 Respond with a JSON object with the following format:
 
                 {{
@@ -141,17 +149,99 @@ def transcribe():
 
         transcriptQA["answers"].append(text)
 
-        print("made it to return jsonify")
         return jsonify({"transcript": text})
     except Exception as e:
-        print("exception raised in transcribe")
         return jsonify({"error": str(e)}), 500
+
+
+
 
 @app.route('/api/evaluate', methods=['POST'])
 def evaluate():
+    #HANDLE THE LAST TRANSCRIPTION BEFORE EVALUATION, EITHER HERE, OR HAVE THE FINAL BUTTON CALL TRANSCRIBE THEN EVALAUATE OR TWO DIFFERENT BUTTONS
     data = request.get_json()
+    pass
+
+    body = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "messages": [
+            {
+                "role": "user",
+                "content": f'''
+
+                    You are a professional interview evaluator. Your task is to review a candidate's interview transcript and assess their performance based on the provided evaluation rubric.
+
+                    You will receive two inputs:
+                    1. **Interview Transcript Questions** — This includes the questions asked by the interviewer in order.
+                    2. **Interview Transcript Answers** — This includes the answers given by the candidate in order.
+                    3. **Evaluation Rubric** — A detailed breakdown of the criteria used to score the interview.
+                    4. **Response Format** — The format of the response you will give.
+
+                    Here are the transcript questions: {transcriptQA["questions"]}
+
+                    Here are the transcript answers: {transcriptQA["answers"]}
+
+                    Here is the evaluation rubric: {prompts.evaluation_rubric}
+
+                    Here is the response format: {prompts.evaluation_response_format}
+
+                    Reply with only the JSON object in the response format.
+    
+                '''
+            }
+        ],
+        "max_tokens": 1000,
+        "temperature": 0.8
+    }
+
+    response = bedrock_client.invoke_model(
+        modelId=modelID,
+        body=json.dumps(body),
+        contentType="application/json",
+        accept="application/json"
+    )
+
+    response_body = json.loads(response['body'].read())
+    #print("Raw Bedrock response:", response_body)
+
+    claude_blocks = response_body.get("message") or response_body.get("content")
+    if not claude_blocks:
+        return jsonify({"error": "Claude response missing 'message' or 'content'"}), 500
+
+    claude_text = claude_blocks[0].get("text", "").strip()
+    clean_json_str = (
+        claude_text
+        .removeprefix("```json")
+        .removesuffix("```")
+        .strip()
+    )
+
+    #THE JSON OBJECT THAT IS RETURNED SHOULD INCLUDE THE TOTAL SCORE, FEEDBACK, AND TRANSCRIPT
+
+    try:
+        parsed = json.loads(clean_json_str)
+        total_score = parsed.get("total_score", "N/A")
+        feedback_list = parsed.get("feedback", [])
+
+        evaluation_result = {
+          "total_score": total_score,
+          "feedback": feedback_list,
+          "transcript_questions": transcriptQA["questions"],
+          "transcript_answers": transcriptQA["answers"]
+        }
+
+        return jsonify(evaluation_result)
+    
+    except Exception as e:
+        print("Evaluation parsing error:", e)
+        return jsonify({"error": "Could not parse Claude's evaluation output"}), 500
+
+
+
+#idk what this is who made this - Tyler
+# @app.route('/api/get_questions', methods=['GET'])
     
 
-if __name__ == "__main__":
-    app.run(debug=True, port=5050)
+# if __name__ == "__main__":
+#     app.run(debug=True, port=5050)
 
