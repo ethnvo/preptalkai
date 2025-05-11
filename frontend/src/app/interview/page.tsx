@@ -14,11 +14,20 @@ const InterviewPage: React.FC = () => {
   const [interviewComplete, setInterviewComplete] = useState<boolean>(false);
   const [audioData, setAudioData] = useState<{[key: number]: string}>({});
   const [loading, setLoading] = useState<boolean>(true);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [audioReady, setAudioReady] = useState<boolean>(false);
+  const [questionPlayed, setQuestionPlayed] = useState<{[key: number]: boolean}>({});
+  const [transcript, setTranscript] = useState<string>('');
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const recognitionRef = useRef<any>(null);
   
   useEffect(() => {
+    // Load questions and job title from localStorage
     if (typeof window !== 'undefined') {
       const storedQuestions = localStorage.getItem('interviewQuestions');
       const storedJobTitle = localStorage.getItem('jobTitle');
@@ -36,36 +45,343 @@ const InterviewPage: React.FC = () => {
         setJobTitle(storedJobTitle);
       }
       
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
-        navigator.mediaDevices.getUserMedia({ audio: true })
-          .then(stream => {
-            console.log('Microphone permission granted');
-          })
-          .catch(error => {
-            console.error('Error accessing microphone:', error);
-            alert('Please allow microphone access to use this feature');
+      // Create audio element
+      const audio = new Audio();
+      audioRef.current = audio;
+      audio.onended = () => {
+        console.log('Audio playback ended');
+        setIsPlaying(false);
+        
+        // Only start countdown if we haven't recorded a response yet and aren't already counting down
+        if (!responses[currentQuestionIndex] && countdown === null && !isRecording) {
+          startCountdown();
+        }
+      };
+      
+      // Fetch question data from localStorage
+      try {
+        const storedQuestionData = localStorage.getItem('interviewQuestionData');
+        if (storedQuestionData) {
+          const parsedQuestionData = JSON.parse(storedQuestionData);
+          // Extract audio data if available
+          const extractedAudioData: {[key: number]: string} = {};
+          Object.keys(parsedQuestionData).forEach((key, index) => {
+            if (parsedQuestionData[key].audio) {
+              extractedAudioData[index] = parsedQuestionData[key].audio;
+            }
           });
+          
+          if (Object.keys(extractedAudioData).length > 0) {
+            setAudioData(extractedAudioData);
+            setAudioReady(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing stored question data:', error);
       }
     }
     
     setLoading(false);
       
+    // Clean up function
     return () => {
       stopRecording();
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+      
+      // Clean up speech recognition if active
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.error('Error stopping speech recognition:', e);
+        }
+      }
     };
   }, []);
+
+  // Set audio as ready when current question changes and auto-play
+  useEffect(() => {
+    if (questions.length > 0 && !showTranscript) {
+      // Reset transcript when changing questions
+      setTranscript('');
+      
+      const hasAudio = audioData[currentQuestionIndex] !== undefined;
+      setAudioReady(hasAudio);
+      
+      // If there's no audio for this question, try to fetch it
+      if (!hasAudio) {
+        fetchQuestionAudio(currentQuestionIndex).then(() => {
+          // Auto-play only if question hasn't been played, no response, and not already playing/recording
+          if (!questionPlayed[currentQuestionIndex] && !responses[currentQuestionIndex] && 
+              !isPlaying && !isRecording && countdown === null) {
+            setTimeout(() => playQuestionAudio(), 500);
+          }
+        });
+      } else if (audioRef.current) {
+        audioRef.current.src = audioData[currentQuestionIndex];
+        // Auto-play only if question hasn't been played yet, no response, and not already playing/recording
+        if (!questionPlayed[currentQuestionIndex] && !responses[currentQuestionIndex] && 
+            !isPlaying && !isRecording && countdown === null) {
+          setTimeout(() => playQuestionAudio(), 500);
+        }
+      }
+    }
+  }, [currentQuestionIndex, questions, audioData, responses, isPlaying, isRecording, countdown, questionPlayed]);
+  
+  const fetchQuestionAudio = async (questionIndex: number) => {
+    // Reset audio states
+    setIsPlaying(false);
+    setAudioReady(false);
+    
+    if (!questions[questionIndex]) return;
+    
+    try {
+      // Check if we already have the audio cached
+      if (audioData[questionIndex]) {
+        if (audioRef.current) {
+          audioRef.current.src = audioData[questionIndex];
+          setAudioReady(true);
+        }
+        return;
+      }
+      
+      console.log(`Fetching audio for question ${questionIndex + 1}`);
+      
+      // Fetch audio from our API
+      const response = await fetch('http://localhost:5050/api/audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: questions[questionIndex] })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.audioBase64) {
+        console.log(`Audio for question ${questionIndex + 1} is ready`);
+        
+        // Store the audio data
+        setAudioData(prev => ({
+          ...prev,
+          [questionIndex]: data.audioBase64
+        }));
+        
+        // Set up the audio element
+        if (audioRef.current) {
+          audioRef.current.src = data.audioBase64;
+          audioRef.current.load();
+        }
+        
+        setAudioReady(true);
+      } else {
+        throw new Error('No audio data received');
+      }
+    } catch (error) {
+      console.error('Error fetching question audio:', error);
+      // Provide fallback using browser's speech synthesis
+      setAudioReady(true); // Mark as ready so we can proceed with fallback
+    }
+  };
+  
+  const playQuestionAudio = () => {
+    if (!audioReady) return;
+    
+    // Mark this question as played to prevent auto-replay
+    setQuestionPlayed(prev => ({
+      ...prev,
+      [currentQuestionIndex]: true
+    }));
+    
+    setIsPlaying(true);
+    
+    // Check if we have the audio URL
+    if (audioRef.current && audioData[currentQuestionIndex]) {
+      // Use the actual audio file
+      audioRef.current.src = audioData[currentQuestionIndex];
+      audioRef.current.onended = () => {
+        setIsPlaying(false);
+        
+        // Only start countdown if we haven't recorded a response yet
+        if (!responses[currentQuestionIndex] && !isRecording) {
+          startCountdown();
+        }
+      };
+      
+      audioRef.current.play().catch(error => {
+        console.error('Error playing audio:', error);
+        fallbackToSpeechSynthesis();
+      });
+    } else {
+      // Fallback to speech synthesis
+      fallbackToSpeechSynthesis();
+    }
+  };
+  
+  const fallbackToSpeechSynthesis = () => {
+    // Use browser's speech synthesis as a fallback
+    if ('speechSynthesis' in window && questions[currentQuestionIndex]) {
+      console.log('Using speech synthesis fallback');
+      const utterance = new SpeechSynthesisUtterance(questions[currentQuestionIndex]);
+      utterance.onend = () => {
+        setIsPlaying(false);
+        
+        // Only start countdown if we haven't recorded a response yet
+        if (!responses[currentQuestionIndex] && !isRecording) {
+          startCountdown();
+        }
+      };
+      
+      // Stop any current speech
+      window.speechSynthesis.cancel();
+      
+      // Start speaking
+      window.speechSynthesis.speak(utterance);
+    } else {
+      // If speech synthesis is not available, simulate audio playing
+      console.log('Speech synthesis not available, simulating audio playback');
+      setTimeout(() => {
+        setIsPlaying(false);
+        
+        // Only start countdown if we haven't recorded a response yet
+        if (!responses[currentQuestionIndex] && !isRecording) {
+          startCountdown();
+        }
+      }, 3000);
+    }
+  };
+  
+  const startCountdown = () => {
+    // If we're already in a countdown or recording, don't start another countdown
+    if (countdown !== null || isRecording) return;
+    
+    setCountdown(3);
+    
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+    }
+    
+    countdownTimerRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          // When countdown reaches 0, start recording
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+          }
+          startRecording();
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+  
+  // New Speech-to-Text implementation
+  const startSpeechRecognition = () => {
+    // Make TypeScript happy with the webkitSpeechRecognition property
+    const windowWithSpeech = window as any;
+    const SpeechRecognition = windowWithSpeech.SpeechRecognition || 
+                              windowWithSpeech.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      console.error("Speech recognition not supported");
+      return false;
+    }
+    
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    
+    // Clear transcript initially
+    setTranscript('');
+    
+    recognition.onresult = (event: any) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + ' ';
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      
+      // Display the final or interim transcript
+      setTranscript(finalTranscript || interimTranscript);
+    };
+    
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+    };
+    
+    try {
+      recognition.start();
+      recognitionRef.current = recognition;
+      console.log('Speech recognition started');
+      return recognition;
+    } catch (e) {
+      console.error('Error starting speech recognition:', e);
+      return false;
+    }
+  };
+  
+  const stopSpeechRecognition = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        console.log('Speech recognition stopped');
+      } catch (e) {
+        console.error('Error stopping speech recognition:', e);
+      }
+      recognitionRef.current = null;
+    }
+  };
   
   const startRecording = async () => {
     audioChunksRef.current = [];
     
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+    // More detailed feature detection
+    if (typeof window === 'undefined') {
+      console.error('Running in SSR context');
+      alert('Recording is not available in this environment');
+      return;
+    }
+    
+    if (!window.navigator) {
+      console.error('Navigator not available');
       alert('Audio recording is not supported in this browser');
+      return;
+    }
+    
+    if (!navigator.mediaDevices) {
+      console.error('MediaDevices not available');
+      alert('Audio recording requires a secure context (HTTPS) or localhost');
+      return;
+    }
+    
+    if (!navigator.mediaDevices.getUserMedia) {
+      console.error('getUserMedia not available');
+      alert('Your browser doesn\'t support audio recording');
       return;
     }
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
       const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
       
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -74,7 +390,7 @@ const InterviewPage: React.FC = () => {
       };
       
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
         const audioUrl = URL.createObjectURL(audioBlob);
         
         setAudioData(prev => ({
@@ -82,17 +398,38 @@ const InterviewPage: React.FC = () => {
           [currentQuestionIndex]: audioUrl
         }));
         
-        simulateTranscription(currentQuestionIndex);
+        // Use the transcript from speech recognition if available
+        if (transcript) {
+          setResponses(prev => ({
+            ...prev,
+            [currentQuestionIndex]: transcript
+          }));
+        } else {
+          // Fallback to simulated transcription if speech recognition failed
+          simulateTranscription(currentQuestionIndex);
+        }
+        
+        console.log('Recording completed and processed.');
       };
       
-      mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.start();
       setIsRecording(true);
+      console.log('Recording started.');
       
-      console.log('Recording started...');
+      // Start speech recognition alongside recording
+      startSpeechRecognition();
+      
     } catch (error) {
-      console.error('Error starting recording:', error);
-      alert('Failed to start recording. Please check your microphone permissions.');
+      console.error('Recording error:', error);
+      // Provide specific error messages based on error type
+      if (error.name === 'NotAllowedError') {
+        alert('Microphone access was denied. Please allow microphone access in your browser settings.');
+      } else {
+        alert(`Recording failed: ${error.message}`);
+      }
+      
+      // Fallback to simulation for demo purposes
+      simulateTranscription(currentQuestionIndex);
     }
   };
   
@@ -101,13 +438,27 @@ const InterviewPage: React.FC = () => {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      if (mediaRecorderRef.current.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+      
+      // Stop speech recognition
+      stopSpeechRecognition();
       
       console.log('Recording stopped.');
     }
   };
   
   const simulateTranscription = (questionIndex: number) => {
+    // Only simulate if we don't have a real transcript
+    if (transcript) {
+      setResponses(prev => ({
+        ...prev,
+        [questionIndex]: transcript
+      }));
+      return;
+    }
+    
     const sampleResponses = [
       "I led a project to optimize our company's data processing pipeline. The existing system was slow and unreliable, so I researched and implemented a new approach using distributed computing with Apache Spark. This reduced processing time by 85% and significantly improved reliability. I coordinated with multiple teams during implementation and ensured a smooth transition.",
       "I approach decisions by carefully analyzing both short-term impacts and long-term strategic goals. For example, when deciding on a new technology stack for our platform, I evaluated immediate development costs and team expertise, but also considered future scalability and maintenance requirements. We chose a slightly more expensive solution initially, but it has saved us significant resources over time.",
@@ -145,6 +496,12 @@ const InterviewPage: React.FC = () => {
     }
     
     router.push('/');
+  };
+  
+  const handlePlayQuestion = () => {
+    if (!isPlaying && !isRecording && countdown === null) {
+      playQuestionAudio();
+    }
   };
   
   if (loading) {
@@ -247,19 +604,71 @@ const InterviewPage: React.FC = () => {
                     <p className="text-gray-200 font-medium">
                       {questions[currentQuestionIndex]}
                     </p>
+                    
+                    {/* Audio controls */}
+                    <div className="mt-4 flex items-center">
+                      {!audioReady && !isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && (
+                        <div className="flex items-center text-gray-400">
+                          <span className="mr-2 animate-spin">⏳</span>
+                          <span>Loading question audio...</span>
+                        </div>
+                      )}
+                      
+                      {audioReady && !isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && (
+                        <button 
+                          onClick={handlePlayQuestion}
+                          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+                        >
+                          <span className="mr-2">▶️</span>
+                          Play Question
+                        </button>
+                      )}
+                      
+                      {/* Audio playing status */}
+                      {isPlaying && (
+                        <div className="flex items-center text-blue-400">
+                          <span className="mr-2">🔊</span>
+                          <div className="flex space-x-1">
+                            <span className="w-1 h-4 bg-blue-400 rounded-full animate-pulse delay-0"></span>
+                            <span className="w-1 h-6 bg-blue-400 rounded-full animate-pulse delay-150"></span>
+                            <span className="w-1 h-8 bg-blue-400 rounded-full animate-pulse delay-300"></span>
+                            <span className="w-1 h-4 bg-blue-400 rounded-full animate-pulse delay-450"></span>
+                          </div>
+                          <span className="ml-3">Playing question audio...</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
                 {/* Recording Interface */}
                 <div className="mb-8">
                   <div className="flex flex-col items-center space-y-6">
-                    {isRecording ? (
+                    {countdown !== null && (
+                      <div className="flex flex-col items-center animate-pulse">
+                        <div className="w-24 h-24 rounded-full bg-yellow-600 flex items-center justify-center mb-3 text-4xl font-bold">
+                          {countdown}
+                        </div>
+                        <p className="text-yellow-400 font-medium mb-2">Get ready to answer...</p>
+                        <p className="text-gray-400 text-sm">Recording will start automatically</p>
+                      </div>
+                    )}
+                    
+                    {isRecording && (
                       <div className="flex flex-col items-center">
                         <div className="w-24 h-24 rounded-full bg-red-600 flex items-center justify-center mb-3 animate-pulse">
                           <span className="text-4xl">🎙️</span>
                         </div>
                         <p className="text-red-400 font-medium mb-2">Recording in progress...</p>
                         <p className="text-gray-400 text-sm mb-6">Speak clearly into your microphone</p>
+                        
+                        {/* Show live transcript */}
+                        {transcript && (
+                          <div className="w-full p-4 bg-gray-800 rounded-lg border border-gray-700 mb-6 max-h-40 overflow-y-auto">
+                            <p className="text-gray-300 text-sm">{transcript}</p>
+                          </div>
+                        )}
+                        
                         <button
                           onClick={stopRecording}
                           className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition flex items-center"
@@ -268,7 +677,9 @@ const InterviewPage: React.FC = () => {
                           Stop Recording
                         </button>
                       </div>
-                    ) : (
+                    )}
+                    
+                    {!isRecording && countdown === null && (
                       <div className="flex flex-col items-center">
                         {responses[currentQuestionIndex] ? (
                           <div className="w-24 h-24 rounded-full bg-green-600/20 flex items-center justify-center mb-3">
@@ -287,31 +698,74 @@ const InterviewPage: React.FC = () => {
                         <p className="text-gray-400 text-sm mb-6">
                           {responses[currentQuestionIndex]
                             ? "You can proceed to the next question or re-record your answer"
-                            : "Click the button below to start speaking"}
+                            : "Click 'Play Question' to hear the question and begin"}
                         </p>
-                        <button
-                          onClick={startRecording}
-                          className={`px-8 py-3 ${
-                            responses[currentQuestionIndex]
-                              ? "bg-gray-700 hover:bg-gray-600"
-                              : "bg-green-600 hover:bg-green-700"
-                          } text-white font-medium rounded-lg transition flex items-center`}
-                        >
-                          <span className="mr-2">⏺️</span>
-                          {responses[currentQuestionIndex] ? "Record Again" : "Start Recording"}
-                        </button>
+                        
+                        {/* Show a replay button for question */}
+                        {!isPlaying && !isRecording && countdown === null && (
+                          <div className="flex space-x-4">
+                            {responses[currentQuestionIndex] && (
+                              <button
+                                onClick={() => {
+                                  // Clear the previous response and restart
+                                  setResponses(prev => {
+                                    const newResponses = {...prev};
+                                    delete newResponses[currentQuestionIndex];
+                                    return newResponses;
+                                  });
+                                  
+                                  // Reset the played state so we can re-listen
+                                  setQuestionPlayed(prev => ({
+                                    ...prev,
+                                    [currentQuestionIndex]: false
+                                  }));
+                                  
+                                  // Clear transcript
+                                  setTranscript('');
+                                }}
+                                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition flex items-center"
+                              >
+                                <span className="mr-2">🔁</span>
+                                Record Again
+                              </button>
+                            )}
+                            
+                            {audioReady && !responses[currentQuestionIndex] && (
+                              <button 
+                                onClick={handlePlayQuestion}
+                                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition flex items-center"
+                              >
+                                <span className="mr-2">🔊</span>
+                                Play Question
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
                 
+                {/* Response preview if available */}
+                {responses[currentQuestionIndex] && !isRecording && (
+                  <div className="mb-8 bg-gray-800 p-4 rounded-lg border border-gray-700">
+                    <h4 className="text-lg font-medium text-white mb-2">Your Response:</h4>
+                    <p className="text-gray-300">{responses[currentQuestionIndex]}</p>
+                  </div>
+                )}
+                
                 {/* Navigation */}
                 <div className="flex justify-between mt-12">
                   <button
-                    onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
-                    disabled={currentQuestionIndex === 0}
+                    onClick={() => {
+                      // Only allow navigation if not currently recording
+                      if (!isRecording && countdown === null) {
+                        setCurrentQuestionIndex(prev => Math.max(0, prev - 1));
+                      }
+                    }}
+                    disabled={currentQuestionIndex === 0 || isRecording || countdown !== null}
                     className={`px-6 py-3 rounded-lg font-medium transition flex items-center ${
-                      currentQuestionIndex === 0
+                      currentQuestionIndex === 0 || isRecording || countdown !== null
                         ? "bg-gray-800 text-gray-500 cursor-not-allowed"
                         : "bg-gray-800 text-gray-200 hover:bg-gray-700"
                     }`}
@@ -322,9 +776,9 @@ const InterviewPage: React.FC = () => {
                   
                   <button
                     onClick={handleNextQuestion}
-                    disabled={!responses[currentQuestionIndex]}
+                    disabled={!responses[currentQuestionIndex] || isRecording || countdown !== null}
                     className={`px-6 py-3 font-medium rounded-lg transition flex items-center ${
-                      !responses[currentQuestionIndex]
+                      !responses[currentQuestionIndex] || isRecording || countdown !== null
                         ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                         : "bg-blue-600 text-white hover:bg-blue-700"
                     }`}

@@ -1,48 +1,14 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-
-// Define proper TypeScript interface for props
-interface ExperienceLevelSelectorProps {
-  experience: string;
-  setExperience: (level: string) => void;
-}
-
-// Define ExperienceLevelSelector component
-const ExperienceLevelSelector: React.FC<ExperienceLevelSelectorProps> = ({ experience, setExperience }) => {
-  return (
-    <div className="mt-4">
-      <label htmlFor="experience-level" className="block text-sm font-medium text-gray-200 mb-2">
-        Experience Level
-      </label>
-      <div className="grid grid-cols-3 gap-2">
-        {['junior', 'mid', 'senior'].map((level) => (
-          <button
-            key={level}
-            onClick={() => setExperience(level)}
-            className={`py-2 px-3 rounded-md text-sm font-medium transition-all ${
-              experience === level
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-          >
-            {level.charAt(0).toUpperCase() + level.slice(1)}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 // Home page component
 const Home: React.FC = () => {
   const router = useRouter();
   const [jobDescription, setJobDescription] = useState<string>('');
   const [jobTitle, setJobTitle] = useState<string>('');
-  const [experience, setExperience] = useState<string>('mid');
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<string>('description');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   
@@ -75,8 +41,7 @@ const Home: React.FC = () => {
     try {
       console.log('Starting interview with:', {
         jobTitle,
-        jobDescription,
-        experienceLevel: experience
+        jobDescription
       });
       
       const response = await fetch('http://localhost:5050/api/start', {
@@ -87,7 +52,8 @@ const Home: React.FC = () => {
         body: JSON.stringify({
           jobDescription,
           jobTitle,
-          experienceLevel: experience,
+          // Default to 'mid' experience for the backend
+          experienceLevel: 'mid',
         }),
       });
       
@@ -97,6 +63,9 @@ const Home: React.FC = () => {
       
       const data = await response.json();
       console.log('Response data:', data);
+      
+      // Store the complete question data including audio in localStorage
+      localStorage.setItem('interviewQuestionData', JSON.stringify(data));
       
       // Parse the questions from the response
       let parsedQuestions: string[] = [];
@@ -139,7 +108,7 @@ const Home: React.FC = () => {
         setError('No interview questions were generated. Please try again.');
         setIsLoading(false);
       } else {
-        // Store questions in localStorage to access on interview page
+        // Store questions and job title in localStorage to access on interview page
         localStorage.setItem('interviewQuestions', JSON.stringify(parsedQuestions));
         localStorage.setItem('jobTitle', jobTitle);
         
@@ -213,87 +182,33 @@ const Home: React.FC = () => {
 
           {/* Main Interview Tool */}
           <div className="bg-gray-900 rounded-xl shadow-2xl overflow-hidden max-w-4xl mx-auto border border-gray-800">
-            {/* Tabs */}
-            <div className="flex border-b border-gray-800">
-              <button
-                onClick={() => setActiveTab('description')}
-                className={`flex items-center px-6 py-4 text-sm font-medium ${
-                  activeTab === 'description'
-                    ? 'border-b-2 border-blue-500 text-blue-500'
-                    : 'text-gray-400 hover:text-gray-200'
-                }`}
-              >
-                <span className="mr-2 text-lg font-bold">📄</span>
-                Job Description
-              </button>
-              <button
-                onClick={() => setActiveTab('advanced')}
-                className={`flex items-center px-6 py-4 text-sm font-medium ${
-                  activeTab === 'advanced'
-                    ? 'border-b-2 border-blue-500 text-blue-500'
-                    : 'text-gray-400 hover:text-gray-200'
-                }`}
-              >
-                <span className="mr-2 text-lg font-bold">⚙️</span>
-                Advanced Options
-              </button>
-            </div>
-
             <div className="p-6">
-              {activeTab === 'description' ? (
-                <>
-                  <div className="mb-6">
-                    <label htmlFor="job-title" className="block text-sm font-medium text-gray-200 mb-2">
-                      Job Title
-                    </label>
-                    <input
-                      type="text"
-                      id="job-title"
-                      className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="e.g. Frontend Developer, Product Manager..."
-                      value={jobTitle}
-                      onChange={(e) => setJobTitle(e.target.value)}
-                    />
-                  </div>
+              <div className="mb-6">
+                <label htmlFor="job-title" className="block text-sm font-medium text-gray-200 mb-2">
+                  Job Title
+                </label>
+                <input
+                  type="text"
+                  id="job-title"
+                  className="w-full p-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g. Frontend Developer, Product Manager..."
+                  value={jobTitle}
+                  onChange={(e) => setJobTitle(e.target.value)}
+                />
+              </div>
 
-                  <div>
-                    <label htmlFor="job-description" className="block text-sm font-medium text-gray-200 mb-2">
-                      Job Description
-                    </label>
-                    <textarea
-                      id="job-description"
-                      className="w-full p-4 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none min-h-[200px]"
-                      value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
-                      placeholder="Paste or type the job description here..."
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <ExperienceLevelSelector experience={experience} setExperience={setExperience} />
-
-                  <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-200 mb-2">
-                      Interview Focus Areas
-                    </label>
-                    <div className="space-y-2">
-                      {['Technical skills', 'Behavioral questions', 'Company culture fit', 'Problem solving'].map((area) => (
-                        <div key={area} className="flex items-center">
-                          <input
-                            type="checkbox"
-                            id={area.replace(/\s+/g, '-').toLowerCase()}
-                            className="h-4 w-4 text-blue-600 rounded"
-                          />
-                          <label htmlFor={area.replace(/\s+/g, '-').toLowerCase()} className="ml-2 text-sm text-gray-300">
-                            {area}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
+              <div>
+                <label htmlFor="job-description" className="block text-sm font-medium text-gray-200 mb-2">
+                  Job Description
+                </label>
+                <textarea
+                  id="job-description"
+                  className="w-full p-4 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none min-h-[200px]"
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  placeholder="Paste or type the job description here..."
+                />
+              </div>
 
               {error && (
                 <div className="mt-4 p-3 bg-red-900/50 border border-red-700 rounded-md text-red-200">
