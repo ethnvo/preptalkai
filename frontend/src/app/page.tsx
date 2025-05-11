@@ -285,13 +285,13 @@ const Home: React.FC = () => {
                         <p className="text-gray-400 mt-1">Our system identifies industry-specific keywords and phrases in your responses, ensuring you speak the language employers expect.</p>
                       </div>
                     </div>
-                    <div className="flex items-start">
+                    {/* <div className="flex items-start">
                       <span className="text-blue-400 mr-3 text-xl">✓</span>
                       <div>
                         <h4 className="text-lg font-medium text-white">Progress Tracking</h4>
                         <p className="text-gray-400 mt-1">Track your improvement over time with detailed performance metrics and progress reports.</p>
                       </div>
-                    </div>
+                    </div> */}
                     <div className="flex items-start">
                       <span className="text-blue-400 mr-3 text-xl">✓</span>
                       <div>
@@ -322,14 +322,14 @@ const Home: React.FC = () => {
             <p className="text-sm text-gray-400">
               &copy; {new Date().getFullYear()} AWSpeakAI. All rights reserved.
             </p>
-            <div className="mt-4 md:mt-0">
+            {/* <div className="mt-4 md:mt-0">
               <select className="bg-gray-800 border border-gray-700 rounded-md text-gray-400 text-sm py-1 px-2">
                 <option value="en">English</option>
                 <option value="es">Español</option>
                 <option value="fr">Français</option>
                 <option value="de">Deutsch</option>
               </select>
-            </div>
+            </div> */}
           </div>
         </div>
       </footer>

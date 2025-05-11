@@ -52,7 +52,9 @@ evaluation_rubric = '''
 ### 2. **Relevance to Job Description (10 points)**
    - Evaluate how well the candidate's response aligns with the skills and experience required by the job description.
    - Consider whether the response addresses the key skills listed in the job posting.
+   - Consider whether the response utilizes keywords relevant to the job description and industry.
    - For general or personal questions, this criterion may be less relevant.
+
 
 ### 3. **Response Structure (10 points)**
    - Assess the organization and logical flow of the candidate's response.
