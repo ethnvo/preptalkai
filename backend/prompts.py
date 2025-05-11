@@ -1,27 +1,45 @@
 bezos_tonality = '''
-### 1. **Innovation & Problem-Solving**
-- Focus: Understanding how candidates drive innovation and solve complex problems.
-- **Key Phrase**: "Innovate," "problem-solving," "challenge the status quo."
-- **Example Question**:  
-  "Tell me about a situation where you had to innovate to solve a complex problem. What was the outcome?"
 
-### 2. **Long-Term Vision**
-- Focus: Evaluating decision-making with long-term impact in mind.
-- **Key Phrase**: "Long-term strategy," "future planning," "sustainable growth."
-- **Example Question**:  
-  "How have you made decisions that consider both immediate goals and long-term impacts? Can you give an example?"
 
-### 3. **Leadership & Ownership**
-- Focus: Assessing leadership qualities, decision-making, and taking ownership.
-- **Key Phrase**: "Leadership," "ownership," "team collaboration," "taking responsibility."
-- **Example Question**:  
-  "Describe a time when you led a team through a difficult project. How did you ensure success?"
+### 1. **Customer Obsession**
+- Always start with the customer and work backward. Deliver value with empathy and urgency.
+- *Example Question*:  
+  *Tell me about a time you went above and beyond to meet a customer's needs.*
 
-### 4. **Risk-Taking & Adaptability**
-- Focus: Understanding candidates’ comfort with ambiguity and calculated risk-taking.
-- **Key Phrase**: "Risk-taking," "adapt to change," "overcome uncertainty."
-- **Example Question**:  
-  "Tell me about a time when you took a risk in your work. What factors did you consider before making the decision?"
+---
+
+### 2. **Ownership & Accountability**
+- Act like an owner, take initiative, and never say “that’s not my job.” Follow through to deliver results.
+- *Example Question*:  
+  *Describe a situation where you took responsibility for a problem that wasn’t directly yours. What did you do?*
+
+---
+
+### 3. **Bias for Action & Problem-Solving**
+- Speed matters. Make decisions with limited information and take calculated risks. Solve problems creatively.
+- *Example Question*:  
+  *Give an example of when you had to act quickly or make a bold decision under uncertainty.*
+
+---
+
+### 4. **High Standards & Results-Driven**
+- Insist on excellence. Set the bar high, focus on measurable outcomes, and hold yourself and others accountable.
+- *Example Question*:  
+  *How have you ensured high-quality results in a high-pressure or resource-limited situation?*
+
+---
+
+### 5. **Curiosity, Learning & Long-Term Thinking**
+- Stay curious, learn continuously, and make decisions that benefit the long-term vision, not just short-term wins.
+- *Example Question*:  
+  *What’s something you’ve recently learned that changed how you approach your work?*
+
+---
+
+### 6. **Leadership, Inclusion & Integrity**
+- Inspire and guide others, embrace diverse perspectives, and always act with honesty and respect.
+- *Example Question*:  
+  *How do you build trust on a team or handle disagreement while maintaining alignment?*
 '''
 
 evaluation_rubric = '''

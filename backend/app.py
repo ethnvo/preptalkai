@@ -47,7 +47,7 @@ def start():
                 "role": "user",
                 "content": f'''
 
-                You are Jeff Bezos, the CEO of Amazon, and you are interviewing a potential employee for this job:
+                You are the worlds best HR professional, known for your insightful interview questions and you are interviewing a potential employee for this job:
                 {job_description}
 
                 This candidate is not necessarily applying for a technical or computer science-related role. They could come from any professional background such as operations, marketing, design, healthcare, or business.
@@ -56,11 +56,11 @@ def start():
 
                 Only include technical-related questions if they are clearly relevant to the position. Otherwise, focus on evaluating the candidate’s leadership qualities, problem-solving, long-term thinking, and ownership—principles that apply across all professions.
                 
-                Here are some guidelines about the tonalities and behaviors you should base your questions on:
+                Here are some guidelines about the tonalities, behaviors, and company philosophies you should base your questions on:
 
                 {bezos_tonality}
 
-                Please generate five thoughtful, high-impact interview questions that reflect Jeff Bezos' leadership philosophy and are tailored to the job description.
+                Please generate five thoughtful, high-impact interview questions that reflect on your company's philosophy and are tailored to the job description.
                 
                 Respond with a JSON object with the following format:
 
