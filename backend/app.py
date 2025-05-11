@@ -122,7 +122,7 @@ def start():
                     audio = future.result()
                     results[f"question{i+1}"] = {
                         "text": questions[i],
-                        "audio": audio
+            #            "audio": audio
                     }
                 except Exception as e:
                     results[f"question{i+1}"] = {
@@ -160,7 +160,11 @@ def transcribe():
 def evaluate():
     #HANDLE THE LAST TRANSCRIPTION BEFORE EVALUATION, EITHER HERE, OR HAVE THE FINAL BUTTON CALL TRANSCRIBE THEN EVALAUATE OR TWO DIFFERENT BUTTONS
     data = request.get_json()
-    pass
+
+    transcriptQA = {
+        "questions": data.get("questions", []),
+        "answers": data.get("answers", [])
+    }
 
     body = {
         "anthropic_version": "bedrock-2023-05-31",
@@ -240,7 +244,8 @@ def evaluate():
 
 #idk what this is who made this - Tyler
 # @app.route('/api/get_questions', methods=['GET'])
-    
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, port=5050)
