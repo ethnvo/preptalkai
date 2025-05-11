@@ -140,10 +140,17 @@ def transcribe():
         text = helper_transcribe.audio_to_text(audio_base64)
 
         transcriptQA["answers"].append(text)
-        
+
+        print("made it to return jsonify")
         return jsonify({"transcript": text})
     except Exception as e:
+        print("exception raised in transcribe")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/evaluate', methods=['POST'])
+def evaluate():
+    data = request.get_json()
+    
 
 if __name__ == "__main__":
     app.run(debug=True, port=5050)
