@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
-// Home page component
 const Home: React.FC = () => {
   const router = useRouter();
   const [jobDescription, setJobDescription] = useState<string>('');
@@ -12,7 +11,6 @@ const Home: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   
-  // Refs for scroll navigation
   const homeRef = useRef<HTMLDivElement>(null);
   const featuresRef = useRef<HTMLDivElement>(null);
   
@@ -24,7 +22,6 @@ const Home: React.FC = () => {
   };
 
   const handleStart = async () => {
-    // Validate inputs
     if (!jobTitle.trim()) {
       setError('Please enter a job title');
       return;
@@ -52,7 +49,6 @@ const Home: React.FC = () => {
         body: JSON.stringify({
           jobDescription,
           jobTitle,
-          // Default to 'mid' experience for the backend
           experienceLevel: 'mid',
         }),
       });
@@ -64,28 +60,22 @@ const Home: React.FC = () => {
       const data = await response.json();
       console.log('Response data:', data);
       
-      // Store the complete question data including audio in localStorage
       localStorage.setItem('interviewQuestionData', JSON.stringify(data));
       
-      // Parse the questions from the response
       let parsedQuestions: string[] = [];
       
       try {
-        // Handle the app.py response format which returns question objects
         if (data.question1 && data.question1.text) {
           console.log('Found question objects in the response');
-          // Extract questions from numbered question objects (question1, question2, etc.)
           const questionKeys = Object.keys(data).filter(key => key.startsWith('question'));
           parsedQuestions = questionKeys
-            .sort() // Sort to ensure correct order (question1, question2, etc.)
+            .sort()
             .map(key => data[key].text)
-            .filter(Boolean); // Remove any undefined/null values
+            .filter(Boolean);
         } 
-        // Also keep the original parsing logic as fallback
         else if (data.questions && Array.isArray(data.questions)) {
           parsedQuestions = data.questions;
         } else if (data.message && typeof data.message === 'string') {
-          // Try to extract JSON from the string
           const jsonMatch = data.message.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const jsonStr = jsonMatch[0];
@@ -108,11 +98,9 @@ const Home: React.FC = () => {
         setError('No interview questions were generated. Please try again.');
         setIsLoading(false);
       } else {
-        // Store questions and job title in localStorage to access on interview page
         localStorage.setItem('interviewQuestions', JSON.stringify(parsedQuestions));
         localStorage.setItem('jobTitle', jobTitle);
         
-        // Navigate to the interview page
         router.push('/interview');
       }
     } catch (err) {
@@ -124,7 +112,6 @@ const Home: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      {/* Navigation */}
       <nav className="bg-gray-900 border-b border-gray-800 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
@@ -158,7 +145,6 @@ const Home: React.FC = () => {
         </div>
       </nav>
 
-      {/* Mobile menu */}
       {isMenuOpen && (
         <div className="md:hidden bg-gray-900 px-2 pt-2 pb-3 space-y-1 sm:px-3 absolute w-full z-40">
           <button onClick={() => scrollToSection(homeRef)} className="text-gray-300 hover:bg-gray-700 hover:text-white block px-3 py-2 rounded-md text-base font-medium w-full text-left">Home</button>
@@ -166,7 +152,6 @@ const Home: React.FC = () => {
         </div>
       )}
 
-      {/* Home Section */}
       <section ref={homeRef} className="pt-20 pb-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
@@ -180,7 +165,6 @@ const Home: React.FC = () => {
             </button>
           </div>
 
-          {/* Main Interview Tool */}
           <div className="bg-gray-900 rounded-xl shadow-2xl overflow-hidden max-w-4xl mx-auto border border-gray-800">
             <div className="p-6">
               <div className="mb-6">
@@ -247,7 +231,6 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* Features Section */}
       <section ref={featuresRef} className="py-24 bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -283,7 +266,6 @@ const Home: React.FC = () => {
             </div>
           </div>
 
-          {/* Additional Features */}
           <div className="mt-16">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
               <div className="order-2 lg:order-1">
@@ -334,7 +316,6 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-gray-900 border-t border-gray-800 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
