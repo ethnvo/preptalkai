@@ -1,4 +1,5 @@
 from flask import Flask, jsonify
+from concurrent.futures import ThreadPoolExecutor
 from flask_cors import CORS
 import boto3
 import base64
@@ -7,9 +8,11 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-def text_to_audio(text):
+def text_to_audio(text, boto3_session=None):
+    if boto3_session is None:
+            boto3_session = boto3.Session()
 
-    polly = boto3.client('polly', region_name='us-west-2')
+    polly = boto3_session.client('polly', region_name='us-west-2')
 
     response = polly.synthesize_speech(
         Text = text,
