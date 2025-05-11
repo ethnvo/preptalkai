@@ -159,7 +159,7 @@ const Home: React.FC = () => {
             <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-4">
               AWSpeak delivers realistic interviews powered by AI, aligned with Amazon’s core values. 
             </p>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-4">
+            <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
             Perfect your responses and align with what matters most to the company.
             </p>
 
