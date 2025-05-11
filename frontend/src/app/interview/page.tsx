@@ -853,15 +853,7 @@ const InterviewPage: React.FC = () => {
                         </div>
                       )}
                       
-                      {audioReady && !isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && (
-                        <button 
-                          onClick={handlePlayQuestion}
-                          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-                        >
-                          <span className="mr-2">▶️</span>
-                          Play Question
-                        </button>
-                      )}
+                      
                       
                       {/* Audio playing status */}
                       {isPlaying && (
@@ -940,28 +932,7 @@ const InterviewPage: React.FC = () => {
                             : "The question will play automatically. Prepare to answer when prompted."}
                         </p>
                         
-                        {/* Show play button for question when no response is recorded */}
-                        {!isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && 
-                          !audioBlobs[currentQuestionIndex] && audioReady && (
-                          <button 
-                            onClick={handlePlayQuestion}
-                            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition flex items-center"
-                          >
-                            <span className="mr-2">🔊</span>
-                            Play Question
-                          </button>
-                        )}
                         
-                        {/* Option to record again if there's already a response */}
-                        {responses[currentQuestionIndex] && !isSubmitting && (
-                          <button
-                            onClick={handleRecordAgain}
-                            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition flex items-center"
-                          >
-                            <span className="mr-2">🔄</span>
-                            Record Again
-                          </button>
-                        )}
                       </div>
                     )}
                   </div>
