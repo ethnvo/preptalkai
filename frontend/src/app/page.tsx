@@ -1,30 +1,17 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-export default function Home() {
-  const [jobDescription, setJobDescription] = useState('');
-  const [jobTitle, setJobTitle] = useState('');
-  const [experience, setExperience] = useState('mid');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('description');
-  
-  // Refs for scroll navigation
-  const homeRef = useRef(null);
-  const featuresRef = useRef(null);
-  
-  const scrollToSection = (ref) => {
-    ref.current.scrollIntoView({ behavior: 'smooth' });
-    setIsMenuOpen(false);
-  };
+// Define proper TypeScript interface for props
+interface ExperienceLevelSelectorProps {
+  experience: string;
+  setExperience: (level: string) => void;
+}
 
-  const handleStart = () => {
-    console.log('Job Description:', jobDescription);
-    console.log('Job Title:', jobTitle);
-    console.log('Experience Level:', experience);
-  };
-
-  const ExperienceLevelSelector = () => (
+// Define ExperienceLevelSelector component
+const ExperienceLevelSelector: React.FC<ExperienceLevelSelectorProps> = ({ experience, setExperience }) => {
+  return (
     <div className="mt-4">
       <label htmlFor="experience-level" className="block text-sm font-medium text-gray-200 mb-2">
         Experience Level
@@ -46,6 +33,125 @@ export default function Home() {
       </div>
     </div>
   );
+};
+
+// Home page component
+const Home: React.FC = () => {
+  const router = useRouter();
+  const [jobDescription, setJobDescription] = useState<string>('');
+  const [jobTitle, setJobTitle] = useState<string>('');
+  const [experience, setExperience] = useState<string>('mid');
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>('description');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  
+  // Refs for scroll navigation
+  const homeRef = useRef<HTMLDivElement>(null);
+  const featuresRef = useRef<HTMLDivElement>(null);
+  
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
+    if (ref.current) {
+      ref.current.scrollIntoView({ behavior: 'smooth' });
+      setIsMenuOpen(false);
+    }
+  };
+
+  const handleStart = async () => {
+    // Validate inputs
+    if (!jobTitle.trim()) {
+      setError('Please enter a job title');
+      return;
+    }
+    
+    if (!jobDescription.trim()) {
+      setError('Please enter a job description');
+      return;
+    }
+    
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      console.log('Starting interview with:', {
+        jobTitle,
+        jobDescription,
+        experienceLevel: experience
+      });
+      
+      const response = await fetch('http://localhost:5050/api/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jobDescription,
+          jobTitle,
+          experienceLevel: experience,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to start interview: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      // Parse the questions from the response
+      let parsedQuestions: string[] = [];
+      
+      try {
+        // Handle the app.py response format which returns question objects
+        if (data.question1 && data.question1.text) {
+          console.log('Found question objects in the response');
+          // Extract questions from numbered question objects (question1, question2, etc.)
+          const questionKeys = Object.keys(data).filter(key => key.startsWith('question'));
+          parsedQuestions = questionKeys
+            .sort() // Sort to ensure correct order (question1, question2, etc.)
+            .map(key => data[key].text)
+            .filter(Boolean); // Remove any undefined/null values
+        } 
+        // Also keep the original parsing logic as fallback
+        else if (data.questions && Array.isArray(data.questions)) {
+          parsedQuestions = data.questions;
+        } else if (data.message && typeof data.message === 'string') {
+          // Try to extract JSON from the string
+          const jsonMatch = data.message.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const jsonStr = jsonMatch[0];
+            const parsedData = JSON.parse(jsonStr);
+            parsedQuestions = parsedData.questions || [];
+          }
+        } else if (data.message && data.message.questions) {
+          parsedQuestions = data.message.questions;
+        }
+        
+        console.log('Parsed questions:', parsedQuestions);
+      } catch (e) {
+        console.error('Error parsing questions:', e);
+        setError('Failed to parse interview questions');
+        setIsLoading(false);
+        return;
+      }
+      
+      if (parsedQuestions.length === 0) {
+        setError('No interview questions were generated. Please try again.');
+        setIsLoading(false);
+      } else {
+        // Store questions in localStorage to access on interview page
+        localStorage.setItem('interviewQuestions', JSON.stringify(parsedQuestions));
+        localStorage.setItem('jobTitle', jobTitle);
+        
+        // Navigate to the interview page
+        router.push('/interview');
+      }
+    } catch (err) {
+      console.error('Error starting interview:', err);
+      setError(err instanceof Error ? err.message : 'Failed to connect to interview service');
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -165,7 +271,7 @@ export default function Home() {
                 </>
               ) : (
                 <>
-                  <ExperienceLevelSelector />
+                  <ExperienceLevelSelector experience={experience} setExperience={setExperience} />
 
                   <div className="mt-6">
                     <label className="block text-sm font-medium text-gray-200 mb-2">
@@ -186,9 +292,13 @@ export default function Home() {
                       ))}
                     </div>
                   </div>
-
-
                 </>
+              )}
+
+              {error && (
+                <div className="mt-4 p-3 bg-red-900/50 border border-red-700 rounded-md text-red-200">
+                  {error}
+                </div>
               )}
 
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-between">
@@ -198,10 +308,23 @@ export default function Home() {
                 </div>
                 <button
                   onClick={handleStart}
-                  className="w-full sm:w-auto px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition flex items-center justify-center"
+                  disabled={isLoading}
+                  className={`w-full sm:w-auto px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition flex items-center justify-center ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
                 >
-                  Start Interview
-                  <span className="ml-2">→</span>
+                  {isLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Preparing...
+                    </>
+                  ) : (
+                    <>
+                      Start Interview
+                      <span className="ml-2">→</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -276,7 +399,7 @@ export default function Home() {
                       <span className="text-blue-400 mr-3 text-xl">✓</span>
                       <div>
                         <h4 className="text-lg font-medium text-white">Interview Recording</h4>
-                        <p className="text-gray-400 mt-1">Review your practice sessions with full text transcripts to identify areas for improvement.</p>
+                        <p className="text-gray-400 mt-1">Review your practice sessions with full voice transcripts to identify areas for improvement.</p>
                       </div>
                     </div>
                   </div>
@@ -290,7 +413,6 @@ export default function Home() {
                 <p className="text-gray-300 mb-8">
                   The system learns from your interactions to provide increasingly personalized feedback and guidance, helping you improve with every session.
                 </p>
-
               </div>
             </div>
           </div>
@@ -317,4 +439,6 @@ export default function Home() {
       </footer>
     </div>
   );
-}
+};
+
+export default Home;
