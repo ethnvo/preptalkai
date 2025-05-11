@@ -21,6 +21,7 @@ const InterviewPage: React.FC = () => {
   const [transcript, setTranscript] = useState<string>('');
   const [audioBlobs, setAudioBlobs] = useState<{[key: number]: Blob}>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [recognitionFailed, setRecognitionFailed] = useState<boolean>(false);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -28,6 +29,7 @@ const InterviewPage: React.FC = () => {
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
   const recognitionRef = useRef<any>(null);
   const synthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const accumulatedTranscriptRef = useRef<string>('');
   
   useEffect(() => {
     // Load questions and job title from localStorage
@@ -122,8 +124,10 @@ const InterviewPage: React.FC = () => {
   // Set audio as ready when current question changes and auto-play
   useEffect(() => {
     if (questions.length > 0 && !showTranscript) {
-      // Reset transcript when changing questions
+      // Reset transcript and recognition failed state when changing questions
       setTranscript('');
+      setRecognitionFailed(false);
+      accumulatedTranscriptRef.current = '';
       
       const hasAudio = audioData[currentQuestionIndex] !== undefined;
       setAudioReady(hasAudio);
@@ -301,7 +305,7 @@ const InterviewPage: React.FC = () => {
     }, 1000);
   };
   
-  // New Speech-to-Text implementation
+  // Improved Speech-to-Text implementation
   const startSpeechRecognition = () => {
     // Make TypeScript happy with the webkitSpeechRecognition property
     const windowWithSpeech = window as any;
@@ -310,6 +314,7 @@ const InterviewPage: React.FC = () => {
     
     if (!SpeechRecognition) {
       console.error("Speech recognition not supported");
+      setRecognitionFailed(true);
       return false;
     }
     
@@ -318,8 +323,10 @@ const InterviewPage: React.FC = () => {
     recognition.interimResults = true;
     recognition.lang = 'en-US';
     
-    // Clear transcript initially
+    // Reset transcript and recognition state
     setTranscript('');
+    setRecognitionFailed(false);
+    accumulatedTranscriptRef.current = '';
     
     recognition.onresult = (event: any) => {
       let interimTranscript = '';
@@ -329,17 +336,55 @@ const InterviewPage: React.FC = () => {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
           finalTranscript += transcript + ' ';
+          // Add to accumulated transcript
+          accumulatedTranscriptRef.current += transcript + ' ';
         } else {
           interimTranscript += transcript;
         }
       }
       
-      // Display the final or interim transcript
-      setTranscript(finalTranscript || interimTranscript);
+      // Display both accumulated final transcript and current interim transcript
+      setTranscript(accumulatedTranscriptRef.current + interimTranscript);
+    };
+    
+    recognition.onend = () => {
+      console.log('Speech recognition ended');
+      // Sometimes speech recognition ends prematurely, restart it if still recording
+      if (isRecording) {
+        try {
+          recognition.start();
+          console.log('Speech recognition restarted');
+        } catch (e) {
+          console.error('Error restarting speech recognition:', e);
+          setRecognitionFailed(true);
+        }
+      }
     };
     
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
+      
+      // Mark recognition as failed for specific errors
+      if (event.error === 'not-allowed' || event.error === 'audio-capture' || 
+          event.error === 'network' || event.error === 'aborted') {
+        setRecognitionFailed(true);
+      }
+      
+      // Restart recognition on error if still recording
+      if (isRecording && event.error !== 'aborted' && event.error !== 'not-allowed') {
+        try {
+          recognition.abort();
+          setTimeout(() => {
+            if (isRecording) {
+              recognition.start();
+              console.log('Speech recognition restarted after error');
+            }
+          }, 1000);
+        } catch (e) {
+          console.error('Error restarting speech recognition after error:', e);
+          setRecognitionFailed(true);
+        }
+      }
     };
     
     try {
@@ -349,6 +394,7 @@ const InterviewPage: React.FC = () => {
       return recognition;
     } catch (e) {
       console.error('Error starting speech recognition:', e);
+      setRecognitionFailed(true);
       return false;
     }
   };
@@ -406,8 +452,12 @@ const InterviewPage: React.FC = () => {
       };
       
       mediaRecorder.onstop = () => {
+        console.log('MediaRecorder onstop fired');
+        
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' });
         const audioUrl = URL.createObjectURL(audioBlob);
+        
+        console.log('Audio blob created:', audioBlob.size, 'bytes');
         
         setAudioData(prev => ({
           ...prev,
@@ -420,16 +470,15 @@ const InterviewPage: React.FC = () => {
         }));
         
         // Use the transcript from speech recognition if available
-        if (transcript) {
-          setResponses(prev => ({
-            ...prev,
-            [currentQuestionIndex]: transcript
-          }));
-        } else {
-          // Fallback to simulated transcription if speech recognition failed
-          simulateTranscription(currentQuestionIndex);
-        }
+        const transcriptText = transcript.trim();
+        console.log('Using transcript:', transcriptText || 'No transcript available');
         
+        setResponses(prev => ({
+          ...prev,
+          [currentQuestionIndex]: transcriptText || ""
+        }));
+        
+        setIsSubmitting(false);
         console.log('Recording completed and processed.');
       };
       
@@ -448,9 +497,6 @@ const InterviewPage: React.FC = () => {
       } else {
         alert(`Recording failed: ${error.message}`);
       }
-      
-      // Fallback to simulation for demo purposes
-      simulateTranscription(currentQuestionIndex);
     }
   };
   
@@ -458,6 +504,8 @@ const InterviewPage: React.FC = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      setIsSubmitting(true);
+
       
       if (mediaRecorderRef.current.stream) {
         mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
@@ -467,36 +515,21 @@ const InterviewPage: React.FC = () => {
       stopSpeechRecognition();
       
       console.log('Recording stopped.');
+
+      setTimeout(() => {
+        if (!responses[currentQuestionIndex] && transcript) {
+          setResponses(prev => ({
+            ...prev,
+            [currentQuestionIndex]: transcript.trim() || "No transcript captured"
+          }));
+          setIsSubmitting(false);
+        }
+      }, 1000);
+  
     }
   };
   
-  const simulateTranscription = (questionIndex: number) => {
-    // Only simulate if we don't have a real transcript
-    if (transcript) {
-      setResponses(prev => ({
-        ...prev,
-        [questionIndex]: transcript
-      }));
-      return;
-    }
-    
-    const sampleResponses = [
-      "I led a project to optimize our company's data processing pipeline. The existing system was slow and unreliable, so I researched and implemented a new approach using distributed computing with Apache Spark. This reduced processing time by 85% and significantly improved reliability. I coordinated with multiple teams during implementation and ensured a smooth transition.",
-      "I approach decisions by carefully analyzing both short-term impacts and long-term strategic goals. For example, when deciding on a new technology stack for our platform, I evaluated immediate development costs and team expertise, but also considered future scalability and maintenance requirements. We chose a slightly more expensive solution initially, but it has saved us significant resources over time.",
-      "I led a cross-functional team through a complex product launch under a tight deadline. I created a detailed project plan with clear milestones, held daily standups, and implemented a transparent issue tracking system. When we encountered supply chain obstacles, I proactively developed alternative solutions and reallocated resources to maintain our timeline. The product launched successfully on time.",
-      "When developing our user authentication system, I advocated for implementing biometric authentication despite the additional complexity. I analyzed security risks, user experience benefits, and competitive landscape before proposing this approach. I mitigated risks by thoroughly testing edge cases and creating detailed fallback mechanisms. The feature significantly improved our security posture while enhancing user satisfaction.",
-      "I always start by directly engaging with customers through interviews and usability testing. In our recent platform redesign, I organized sessions with key users to understand their workflows and pain points. This led to us completely rethinking our navigation structure. Rather than following industry trends, we prioritized the specific needs of our users, resulting in a 40% increase in user engagement."
-    ];
-    
-    const transcription = sampleResponses[questionIndex % sampleResponses.length];
-    
-    setResponses(prev => ({
-      ...prev,
-      [questionIndex]: transcription
-    }));
-  };
-  
-  const sendAudioToBackend = async (questionIndex: number) => {
+  const sendAudioForBackendTranscription = async (questionIndex: number) => {
     if (!audioBlobs[questionIndex]) {
       console.log('No audio blob available for this question');
       return;
@@ -525,7 +558,7 @@ const InterviewPage: React.FC = () => {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 questionIndex,
-                audioBase64: base64Audio,
+                audio: base64Audio,
                 question: questions[questionIndex],
                 jobTitle
               })
@@ -543,6 +576,7 @@ const InterviewPage: React.FC = () => {
                 ...prev,
                 [questionIndex]: data.transcript
               }));
+              setRecognitionFailed(false);
             }
             
             setIsSubmitting(false);
@@ -574,7 +608,7 @@ const InterviewPage: React.FC = () => {
     
     try {
       if (audioBlobs[currentQuestionIndex]) {
-        await sendAudioToBackend(currentQuestionIndex);
+        await sendAudioForBackendTranscription(currentQuestionIndex);
       }
       
       if (currentQuestionIndex < questions.length - 1) {
@@ -601,7 +635,7 @@ const InterviewPage: React.FC = () => {
     
     try {
       if (audioBlobs[currentQuestionIndex]) {
-        await sendAudioToBackend(currentQuestionIndex);
+        await sendAudioForBackendTranscription(currentQuestionIndex);
       }
     } catch (error) {
       console.error('Error sending final audio:', error);
@@ -642,6 +676,8 @@ const InterviewPage: React.FC = () => {
     
     // Clear transcript
     setTranscript('');
+    accumulatedTranscriptRef.current = '';
+    setRecognitionFailed(false);
     
     // Remove the audio data for this question to start fresh
     setAudioBlobs(prev => {
@@ -768,7 +804,7 @@ const InterviewPage: React.FC = () => {
                         </div>
                       )}
                       
-                      {audioReady && !isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && (
+                      {/* {audioReady && !isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && (
                         <button 
                           onClick={handlePlayQuestion}
                           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
@@ -776,7 +812,7 @@ const InterviewPage: React.FC = () => {
                           <span className="mr-2">▶️</span>
                           Play Question
                         </button>
-                      )}
+                      )} */}
                       
                       {/* Audio playing status */}
                       {isPlaying && (
@@ -856,7 +892,8 @@ const InterviewPage: React.FC = () => {
                         </p>
                         
                         {/* Show play button for question when no response is recorded */}
-                        {!isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && audioReady && (
+                        {!isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && 
+                          !audioBlobs[currentQuestionIndex] && audioReady && (
                           <button 
                             onClick={handlePlayQuestion}
                             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition flex items-center"
@@ -917,7 +954,7 @@ const InterviewPage: React.FC = () => {
                       </>
                     ) : currentQuestionIndex < questions.length - 1 ? (
                       <>
-                        Next
+                        Submit Response
                         <span className="ml-2">→</span>
                       </>
                     ) : (
