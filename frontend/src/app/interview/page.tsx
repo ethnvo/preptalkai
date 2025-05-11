@@ -22,7 +22,13 @@ const InterviewPage: React.FC = () => {
   const [audioBlobs, setAudioBlobs] = useState<{[key: number]: Blob}>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [recognitionFailed, setRecognitionFailed] = useState<boolean>(false);
-  
+  const [pageJustLoaded, setPageJustLoaded] = useState<boolean>(true);
+  const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
+  const [evaluationResults, setEvaluationResults] = useState<{
+    total_score: string;
+    feedback: string[];
+  } | null>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -632,6 +638,15 @@ const InterviewPage: React.FC = () => {
   
   const handleFinishInterview = async () => {
     if (isSubmitting) return;
+
+    stopAudioPlayback();
+    stopSpeechSynthesis();
+
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      setCountdown(null);
+    }
+  
     
     try {
       if (audioBlobs[currentQuestionIndex]) {
@@ -688,6 +703,40 @@ const InterviewPage: React.FC = () => {
     
     // Start playback again
     setTimeout(() => playQuestionAudio(), 300);
+  };
+  
+  // New function to handle the evaluation request
+  const handleEvaluateInterview = async () => {
+    if (isEvaluating) return;
+    
+    setIsEvaluating(true);
+    
+    try {
+      const response = await fetch('http://localhost:5050/api/evaluate', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to evaluate interview: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('Evaluation response:', data);
+      
+      setEvaluationResults({
+        total_score: data.total_score,
+        feedback: data.feedback
+      });
+      
+    } catch (error) {
+      console.error('Error evaluating interview:', error);
+      alert('Failed to evaluate the interview. Please try again.');
+    } finally {
+      setIsEvaluating(false);
+    }
   };
   
   if (loading) {
@@ -804,7 +853,7 @@ const InterviewPage: React.FC = () => {
                         </div>
                       )}
                       
-                      {/* {audioReady && !isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && (
+                      {audioReady && !isPlaying && !isRecording && countdown === null && !responses[currentQuestionIndex] && (
                         <button 
                           onClick={handlePlayQuestion}
                           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
@@ -812,7 +861,7 @@ const InterviewPage: React.FC = () => {
                           <span className="mr-2">▶️</span>
                           Play Question
                         </button>
-                      )} */}
+                      )}
                       
                       {/* Audio playing status */}
                       {isPlaying && (
@@ -888,7 +937,7 @@ const InterviewPage: React.FC = () => {
                         <p className="text-gray-400 text-sm mb-6">
                           {responses[currentQuestionIndex]
                             ? "Your answer has been recorded and will be sent when you proceed to the next question"
-                            : "Click 'Play Question' to hear the question and begin answering"}
+                            : "The question will play automatically. Prepare to answer when prompted."}
                         </p>
                         
                         {/* Show play button for question when no response is recorded */}
@@ -900,6 +949,17 @@ const InterviewPage: React.FC = () => {
                           >
                             <span className="mr-2">🔊</span>
                             Play Question
+                          </button>
+                        )}
+                        
+                        {/* Option to record again if there's already a response */}
+                        {responses[currentQuestionIndex] && !isSubmitting && (
+                          <button
+                            onClick={handleRecordAgain}
+                            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition flex items-center"
+                          >
+                            <span className="mr-2">🔄</span>
+                            Record Again
                           </button>
                         )}
                       </div>
@@ -986,7 +1046,57 @@ const InterviewPage: React.FC = () => {
                   </p>
                 </div>
                 
-                <div className="space-y-8 mt-10">
+                {/* Evaluation Results */}
+                {evaluationResults ? (
+                  <div className="bg-gray-800 p-6 rounded-lg border border-gray-700 mb-10">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-white">Your Interview Performance</h3>
+                      <div className="flex items-center">
+                        <div className="text-2xl font-bold text-blue-400">{evaluationResults.total_score}</div>
+                        <div className="text-gray-400 ml-1">/100</div>
+                      </div>
+                    </div>
+                    
+                    <h4 className="text-lg font-medium text-white mb-3">Feedback:</h4>
+                    <ul className="space-y-4">
+                      {evaluationResults.feedback.map((point, index) => (
+                        <li key={index} className="flex items-start">
+                          <span className="text-blue-400 mr-3 text-xl flex-shrink-0">✓</span>
+                          <p className="text-gray-300">{point}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="flex justify-center mb-10">
+                    <button
+                      onClick={handleEvaluateInterview}
+                      disabled={isEvaluating}
+                      className={`px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition flex items-center ${
+                        isEvaluating ? 'opacity-70 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {isEvaluating ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Evaluating your interview...
+                        </>
+                      ) : (
+                        <>
+                          <span className="mr-2">📊</span>
+                          Get Interview Feedback
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+                
+                {/* Transcript */}
+                <h3 className="text-lg font-medium text-white mb-4">Interview Transcript:</h3>
+                <div className="space-y-8 mt-6">
                   {questions.map((question, index) => (
                     <div key={index} className="bg-gray-800 p-6 rounded-lg border border-gray-700">
                       <div className="flex items-start space-x-4 mb-6">
