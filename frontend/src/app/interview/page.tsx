@@ -827,7 +827,7 @@ const InterviewPage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row items-center mb-8 bg-gray-800 p-6 rounded-lg border border-gray-700">
                   <div className="w-32 h-32 rounded-full bg-blue-900/50 mb-4 sm:mb-0 sm:mr-6 overflow-hidden flex-shrink-0 flex items-center justify-center">
                     <img 
-                      src="/api/placeholder/128/128" 
+                      src="/20150224165308-jeff-bezos-amazon.jpeg" 
                       alt="Jeff Bezos"
                       className="w-full h-full object-cover"
                     />
