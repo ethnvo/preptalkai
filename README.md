@@ -1,6 +1,6 @@
-# PrepTalk.ai – Frontend
+# AWSPeak.ai – Frontend
 
-This is the frontend for **PrepTalk.ai**, an AI-powered interview prep tool that simulates behavioral interviews using personas like Jeff Bezos. Built with **Next.js**, **TypeScript**, and **Tailwind CSS**.
+This is the frontend for **AWSpeak.AI**, an AI-powered interview prep tool that simulates behavioral interviews using personas like Jeff Bezos. Built with **Next.js**, **TypeScript**, and **Tailwind CSS**.
 
 ## 🚀 Tech Stack
 
@@ -8,6 +8,20 @@ This is the frontend for **PrepTalk.ai**, an AI-powered interview prep tool that
 - [React](https://reactjs.org/)
 - [TypeScript](https://www.typescriptlang.org/)
 - [Tailwind CSS](https://tailwindcss.com/)
+
+- Python 3.11
+- Flask
+- flask-cors
+- boto3 (for AWS integration)
+- pygame (for audio support)
+- AWS S3 Bucket (audio file storage)
+- AWS Polly (text to speech capabilities)
+- AWS Transcribe (transcribe speech to text)
+- AWS Bedrock (LLM connection to Claude 3.7 Sonnet)
+
+![Tech Stack](./image.png)
+
+
 
 ## 🛠 Setup Instructions
 
@@ -40,17 +54,12 @@ frontend/
 
 ---
 
-# PrepTalk.ai – Backend
+# AWSpeak.AI – Backend
 
-This is the backend for **PrepTalk.ai**, a Flask-based API that powers the AI interview simulator.
+This is the backend for **AWSpeak.AI**, a Flask-based API that powers the AI interview simulator.
 
 ## 🔧 Tech Stack
 
-- Python 3.11
-- Flask
-- flask-cors
-- boto3 (for AWS integration)
-- pygame (for audio support)
 
 ## 🛠 Setup Instructions
 
@@ -105,5 +114,26 @@ backend/
   ```bash
   source backend/venv/bin/activate
   ```
+
+# Team Contributions
+
+Nhan Nguyen:
+
+- Frontend working with Typescript
+- Connected frontend to backend
+- Tweak backend code to fix minor bugs
+
+Tyler Doan:
+
+- Integrated Bedrock, Polly, Transcribe
+- Prompt Engineering for Claude 3.7 Sonnet
+- Design and implementation of system architecture
+
+Ethan Vo:
+
+- Backend frontend interaction through API endpoints
+- Setup workin environment
+- Debug code
+- Design and implementation of system architecture
 
 ---
