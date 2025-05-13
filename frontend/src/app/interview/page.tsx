@@ -78,7 +78,12 @@ const InterviewPage: React.FC = () => {
           const extractedAudioData: {[key: number]: string} = {};
           Object.keys(parsedQuestionData).forEach((key, index) => {
             if (parsedQuestionData[key].audio) {
-              extractedAudioData[index] = parsedQuestionData[key].audio;
+              // Ensure proper audio data format
+              let audioData = parsedQuestionData[key].audio;
+              if (!audioData.startsWith('data:audio/mpeg;base64,')) {
+                audioData = `data:audio/mpeg;base64,${audioData}`;
+              }
+              extractedAudioData[index] = audioData;
             }
           });
           
@@ -129,7 +134,7 @@ const InterviewPage: React.FC = () => {
 
   // Set audio as ready when current question changes and auto-play
   useEffect(() => {
-    if (questions.length > 0 && !showTranscript) {
+    if (questions.length > 0 && !showTranscript && !interviewComplete) {
       // Reset transcript and recognition failed state when changing questions
       setTranscript('');
       setRecognitionFailed(false);
@@ -138,25 +143,33 @@ const InterviewPage: React.FC = () => {
       const hasAudio = audioData[currentQuestionIndex] !== undefined;
       setAudioReady(hasAudio);
       
-      // If there's no audio for this question, try to fetch it
-      if (!hasAudio) {
-        fetchQuestionAudio(currentQuestionIndex).then(() => {
-          // Auto-play only if question hasn't been played, no response, and not already playing/recording
-          if (!questionPlayed[currentQuestionIndex] && !responses[currentQuestionIndex] && 
-              !isPlaying && !isRecording && countdown === null) {
-            setTimeout(() => playQuestionAudio(), 500);
-          }
-        });
-      } else if (audioRef.current) {
-        audioRef.current.src = audioData[currentQuestionIndex];
-        // Auto-play only if question hasn't been played yet, no response, and not already playing/recording
-        if (!questionPlayed[currentQuestionIndex] && !responses[currentQuestionIndex] && 
-            !isPlaying && !isRecording && countdown === null) {
-          setTimeout(() => playQuestionAudio(), 500);
+      if (audioRef.current) {
+        // Stop any current playback
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        
+        // Set the new source
+        if (hasAudio) {
+          audioRef.current.src = audioData[currentQuestionIndex];
         }
       }
     }
-  }, [currentQuestionIndex, questions, audioData, responses, isPlaying, isRecording, countdown, questionPlayed]);
+  }, [currentQuestionIndex, questions, audioData, showTranscript, interviewComplete]);
+
+  // Separate effect for auto-playing audio
+  useEffect(() => {
+    if (questions.length > 0 && !showTranscript && !interviewComplete && audioReady && !isPlaying && !isRecording && countdown === null) {
+      // Only auto-play if:
+      // 1. Question hasn't been played yet
+      // 2. No response recorded
+      // 3. Not currently playing or recording
+      // 4. Not in transcript view
+      // 5. Interview is not complete
+      if (!questionPlayed[currentQuestionIndex] && !responses[currentQuestionIndex]) {
+        playQuestionAudio();
+      }
+    }
+  }, [currentQuestionIndex, audioReady, isPlaying, isRecording, countdown, questionPlayed, responses, showTranscript, interviewComplete]);
   
   const fetchQuestionAudio = async (questionIndex: number) => {
     // Reset audio states
@@ -175,49 +188,51 @@ const InterviewPage: React.FC = () => {
         return;
       }
       
-      console.log(`Fetching audio for question ${questionIndex + 1}`);
-      
-      // Fetch audio from our API
-      const response = await fetch('http://localhost:5050/api/audio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: questions[questionIndex] })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch audio: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.audioBase64) {
-        console.log(`Audio for question ${questionIndex + 1} is ready`);
+      // Get the audio data from localStorage
+      const storedQuestionData = localStorage.getItem('interviewQuestionData');
+      if (storedQuestionData) {
+        const parsedQuestionData = JSON.parse(storedQuestionData);
+        const questionKey = `question${questionIndex + 1}`;
         
-        // Store the audio data
-        setAudioData(prev => ({
-          ...prev,
-          [questionIndex]: data.audioBase64
-        }));
-        
-        // Set up the audio element
-        if (audioRef.current) {
-          audioRef.current.src = data.audioBase64;
-          audioRef.current.load();
+        if (parsedQuestionData[questionKey] && parsedQuestionData[questionKey].audio) {
+          // Ensure the audio data has the correct format
+          let audioDataUrl = parsedQuestionData[questionKey].audio;
+          if (!audioDataUrl.startsWith('data:audio/mpeg;base64,')) {
+            audioDataUrl = `data:audio/mpeg;base64,${audioDataUrl}`;
+          }
+          
+          setAudioData(prev => ({
+            ...prev,
+            [questionIndex]: audioDataUrl
+          }));
+          
+          if (audioRef.current) {
+            audioRef.current.src = audioDataUrl;
+            audioRef.current.load();
+          }
+          
+          setAudioReady(true);
+          return;
         }
-        
-        setAudioReady(true);
-      } else {
-        throw new Error('No audio data received');
       }
+      
+      // If we get here, we couldn't find the audio data
+      console.error('No audio data found for question', questionIndex + 1);
+      fallbackToSpeechSynthesis();
+      
     } catch (error) {
-      console.error('Error fetching question audio:', error);
-      // Provide fallback using browser's speech synthesis
-      setAudioReady(true); // Mark as ready so we can proceed with fallback
+      console.error('Error loading question audio:', error);
+      fallbackToSpeechSynthesis();
     }
   };
   
   const playQuestionAudio = () => {
-    if (!audioReady) return;
+    if (!audioReady || isPlaying || interviewComplete || showTranscript) {
+      console.log('Skipping audio playback:', { audioReady, isPlaying, interviewComplete, showTranscript });
+      return;
+    }
+    
+    console.log('Starting audio playback');
     
     // Mark this question as played to prevent auto-replay
     setQuestionPlayed(prev => ({
@@ -232,6 +247,7 @@ const InterviewPage: React.FC = () => {
       // Use the actual audio file
       audioRef.current.src = audioData[currentQuestionIndex];
       audioRef.current.onended = () => {
+        console.log('Audio playback ended');
         setIsPlaying(false);
         
         // Only start countdown if we haven't recorded a response yet
@@ -240,10 +256,20 @@ const InterviewPage: React.FC = () => {
         }
       };
       
-      audioRef.current.play().catch(error => {
-        console.error('Error playing audio:', error);
+      // Add error handling for audio playback
+      audioRef.current.onerror = (e) => {
+        console.error('Error playing audio:', e);
         fallbackToSpeechSynthesis();
-      });
+      };
+      
+      // Try to play the audio
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error('Error playing audio:', error);
+          fallbackToSpeechSynthesis();
+        });
+      }
     } else {
       // Fallback to speech synthesis
       fallbackToSpeechSynthesis();
@@ -639,14 +665,24 @@ const InterviewPage: React.FC = () => {
   const handleFinishInterview = async () => {
     if (isSubmitting) return;
 
-    stopAudioPlayback();
+    // Immediately set interview as complete to prevent any audio playback
+    setInterviewComplete(true);
+    setShowTranscript(true);
+
+    // Stop any current audio playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current.src = '';
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+    }
     stopSpeechSynthesis();
 
     if (countdownTimerRef.current) {
       clearInterval(countdownTimerRef.current);
       setCountdown(null);
     }
-  
     
     try {
       if (audioBlobs[currentQuestionIndex]) {
@@ -655,8 +691,12 @@ const InterviewPage: React.FC = () => {
     } catch (error) {
       console.error('Error sending final audio:', error);
     } finally {
-      setInterviewComplete(true);
-      setShowTranscript(true);
+      // Mark all questions as played to prevent any replay
+      const allQuestionsPlayed = questions.reduce((acc, _, index) => ({
+        ...acc,
+        [index]: true
+      }), {});
+      setQuestionPlayed(allQuestionsPlayed);
     }
   };
   

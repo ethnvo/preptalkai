@@ -144,7 +144,8 @@ You will return:
    - **What to improve**: Identify areas for improvement. Describe *why* those areas matter, the *impact* strong performance could have, and provide *practical suggestions* for how to improve (e.g., rephrasing, adding examples, improving structure).
    - Avoid generic praise or criticism. Tailor your feedback to the content of the transcript.
    - Keep the language clear and concise. Avoid over-explaining or repeating rubric categories directly unless relevant to your feedback.
-
+   - Do not mention anything about the number of responses, only feedback on the actual responses. 
+   
 Your goal is to guide the candidate with useful insights that help them feel motivated and better prepared for future interviews.
 
 

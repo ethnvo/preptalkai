@@ -16,7 +16,7 @@ def text_to_audio(text, boto3_session=None):
     response = polly.synthesize_speech(
         Text = text,
         OutputFormat = "mp3",
-        VoiceId= "Ayanda",
+        VoiceId= "Matthew",
         Engine = "neural"
     )
 
