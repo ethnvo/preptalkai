@@ -1,6 +1,6 @@
-# AWSPeak.ai – Frontend
+# AWSpeak – Frontend
 
-This is the frontend for **AWSpeak.AI**, an AI-powered interview prep tool that simulates behavioral interviews using personas like Jeff Bezos. Built with **Next.js**, **TypeScript**, and **Tailwind CSS**.
+This is the frontend for **AWSpeak**, an AI-powered interview prep tool that simulates behavioral interviews using personas like Jeff Bezos. Built with **Next.js**, **TypeScript**, and **Tailwind CSS**.
 
 ## 🚀 Tech Stack
 
